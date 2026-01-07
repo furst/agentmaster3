@@ -37,15 +37,27 @@ ${config.interests.map((i) => `- ${i}`).join("\n")}`
 Workflow:
 1. Use exa_search to find recent news (use includeDomains to filter by configured sites)
 2. Use exa_get_contents to get full article text if needed
-3. Summarize the headlines - usually search results have enough info
+3. Present headlines using ContentCard format
 
 Important:
 - No commentary like "I'll fetch..." or "The most interesting story is..."
-- Just list the news items directly
+- Just present the news items directly
 ${sitesSection}${interestsSection}
 
-Output format (be concise):
-**Headline** - one line summary. [link]`;
+## Output Format
+
+Present news in a ContentCard for better visibility:
+
+:::news "Today's Headlines"
+**Story Title** - Brief one-line summary [source]
+
+**Another Story** - Brief summary [source]
+
+**Third Story** - Brief summary [source]
+:::
+
+For topic-specific requests, use a descriptive title like "Tech News" or "Sports Headlines".
+Inside the card, use **bold** for headlines and keep summaries to one line each.`;
 }
 
 export default function News({ options }: Props) {

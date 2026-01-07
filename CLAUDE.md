@@ -25,7 +25,8 @@ source/
 │   └── agent.ts        # Agent factory + useAgent hook
 ├── components/
 │   ├── AgentShell.tsx  # Main agent UI wrapper
-│   ├── Message.tsx     # Message rendering
+│   ├── Message.tsx     # Message rendering (supports ContentCard markers)
+│   ├── ContentCard.tsx # Highlighted content boxes for important data
 │   ├── ToolCall.tsx    # Tool call visualization (Claude Code-inspired)
 │   ├── Timeline.tsx    # Status timeline
 │   ├── Spinner.tsx     # Loading indicators
@@ -42,7 +43,8 @@ source/
 │   └── index.ts        # Tool registry
 └── utils/
     ├── format.ts       # Text formatting helpers
-    └── streaming.ts    # Stream processing utilities
+    ├── streaming.ts    # Stream processing utilities
+    └── content-parser.ts # Parses ContentCard markers in messages
 ```
 
 ## Adding a New Agent
@@ -341,6 +343,93 @@ const tool = defineTool({
   description: 'What this tool does',
   parameters: z.object({ ... }),
   execute: async (params, context) => { ... },
+});
+```
+
+## ContentCard - Highlighted Content Display
+
+Use ContentCard markers in agent responses to present important data (recipes, news, finance summaries, etc.) in visually distinct bordered boxes.
+
+### Syntax
+
+```
+:::type "Optional Title"
+Content here with **bold** and *italic* formatting
+- List items work
+- With bullet points
+1. Numbered lists too
+Key: Value pairs are highlighted
+:::
+```
+
+### Available Types
+
+| Type | Icon | Border | Use Case |
+|------|------|--------|----------|
+| `recipe` | `🍳` | yellow/round | Food recipes, cooking instructions |
+| `news` | `📰` | blue/round | News articles, headlines |
+| `finance` | `💰` | green/double | Financial data, portfolio summaries |
+| `summary` | `📋` | cyan/round | General summaries, overviews |
+| `list` | `📝` | magenta/single | Lists, collections |
+| `info` | `ℹ` | blue/single | Informational content |
+| `warning` | `⚠` | yellow/bold | Warnings, cautions |
+| `success` | `✓` | green/single | Success messages, confirmations |
+
+### Example Usage in Agent System Prompts
+
+Add instructions to your agent's system prompt:
+
+```
+When presenting recipes, news summaries, or important data, use ContentCard markers:
+
+:::recipe "Pasta Carbonara"
+Prep Time: 15 minutes
+Cook Time: 20 minutes
+
+## Ingredients
+- 400g spaghetti
+- 200g pancetta
+- 4 egg yolks
+- 100g parmesan
+
+## Instructions
+1. Cook pasta in salted water
+2. Fry pancetta until crispy
+3. Mix eggs with cheese
+4. Combine everything off heat
+:::
+```
+
+### Supported Formatting Inside Cards
+
+- **Headers**: `# H1`, `## H2`, `### H3`
+- **Bold**: `**text**`
+- **Italic**: `*text*`
+- **Bullet lists**: `- item` or `* item`
+- **Numbered lists**: `1. item`
+- **Key-value pairs**: `Label: value` (auto-highlighted)
+
+### Programmatic Usage
+
+```typescript
+import { ContentCard } from '../components/ContentCard.js';
+import { parseContentWithCards } from '../utils/content-parser.js';
+
+// Direct component usage
+<ContentCard
+  type="recipe"
+  title="Pasta Carbonara"
+  content="Ingredients:\n- 400g spaghetti\n..."
+/>
+
+// Parse text with markers
+const segments = parseContentWithCards(assistantMessage);
+segments.forEach(segment => {
+  if (segment.type === 'card') {
+    // Render ContentCard
+  } else {
+    // Render plain text
+  }
 });
 ```
 

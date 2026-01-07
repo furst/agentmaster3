@@ -1,5 +1,7 @@
 import React from 'react';
 import { Box, Text, Static } from 'ink';
+import { ContentCard } from './ContentCard.js';
+import { parseContentWithCards, hasCardMarkers } from '../utils/content-parser.js';
 
 export interface MessageProps {
 	/** Message role */
@@ -14,11 +16,46 @@ export interface MessageProps {
 
 /**
  * Renders a conversation message with role-based styling
+ * Supports ContentCard markers for highlighted sections
  */
 export function Message({ role, content, isStreaming, color }: MessageProps) {
 	const isUser = role === 'user';
 	const prefix = isUser ? '>' : '';
 	const textColor = color ?? (isUser ? 'green' : 'white');
+
+	// For assistant messages, check for card markers
+	const shouldParseCards = !isUser && !isStreaming && hasCardMarkers(content);
+
+	if (shouldParseCards) {
+		const segments = parseContentWithCards(content);
+
+		return (
+			<Box flexDirection="column" marginY={1}>
+				{segments.map((segment, index) => {
+					if (segment.type === 'card' && segment.cardType) {
+						return (
+							<ContentCard
+								key={`card-${index}`}
+								type={segment.cardType}
+								title={segment.title}
+								content={segment.content}
+							/>
+						);
+					}
+					// Add margin between text and following card
+					const nextSegment = segments[index + 1];
+					const needsBottomMargin = nextSegment?.type === 'card';
+					return (
+						<Box key={`text-${index}`} marginBottom={needsBottomMargin ? 1 : 0}>
+							<Text color={textColor} wrap="wrap">
+								{segment.content}
+							</Text>
+						</Box>
+					);
+				})}
+			</Box>
+		);
+	}
 
 	return (
 		<Box flexDirection="column" marginY={1}>

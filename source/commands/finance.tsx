@@ -74,7 +74,35 @@ ${newsletterSection}
 - Use bullet points for clarity
 - Include source links when available
 - Structure longer analyses with headers
-- When presenting investment ideas, always include both opportunities and risks`;
+- When presenting investment ideas, always include both opportunities and risks
+
+## Content Formatting
+
+Use ContentCard markers to highlight important findings and summaries:
+
+:::finance "Company Analysis: TICKER"
+Current Price: $XXX
+Market Cap: $XXB
+
+## Bull Case
+- Key opportunity 1
+- Key opportunity 2
+
+## Bear Case
+- Key risk 1
+- Key risk 2
+
+## Sources
+- [Source 1](url)
+:::
+
+Available card types:
+- \`finance\` - For investment analysis, portfolio summaries, company research
+- \`summary\` - For newsletter summaries and overviews
+- \`warning\` - For risk warnings and cautions
+- \`news\` - For market news roundups
+
+Inside cards use \`Key: Value\` for metrics (auto-highlighted), \`## Headers\` for sections, and \`**bold**\` for emphasis.`;
 }
 
 export default function Finance({ options }: Props) {

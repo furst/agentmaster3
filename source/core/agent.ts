@@ -248,11 +248,17 @@ export function useAgent(agent: Agent) {
 		setMessages((prev) => [...prev, userMessage]);
 
 		let assistantContent = '';
+		let hadToolCallSinceLastText = false;
 
 		try {
 			await agentRef.current.sendMessage(content, (event) => {
 				switch (event.type) {
 					case 'text-delta':
+						// Add space separator if there was a tool call since last text
+						if (hadToolCallSinceLastText && assistantContent.length > 0) {
+							assistantContent += ' ';
+							hadToolCallSinceLastText = false;
+						}
 						assistantContent += event.content ?? '';
 						setStreamingContent(assistantContent);
 						break;
@@ -282,6 +288,7 @@ export function useAgent(agent: Agent) {
 										: tc
 								)
 							);
+							hadToolCallSinceLastText = true;
 						}
 						break;
 
@@ -294,6 +301,7 @@ export function useAgent(agent: Agent) {
 										: tc
 								)
 							);
+							hadToolCallSinceLastText = true;
 						}
 						break;
 
