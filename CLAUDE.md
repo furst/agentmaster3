@@ -35,6 +35,10 @@ source/
 │   ├── web-search.ts   # Web search (stub)
 │   ├── jina-reader.ts  # Fetch URLs as clean markdown (no API key)
 │   ├── exa-search.ts   # Exa semantic search + contents (requires EXA_API_KEY)
+│   ├── list-pdfs.ts    # List PDF files in a directory
+│   ├── read-pdf.ts     # Read and extract/summarize PDF content
+│   ├── mindset.ts      # Read/save user investment philosophy
+│   ├── obsidian-vault.ts # Read/write markdown notes in Obsidian vault
 │   └── index.ts        # Tool registry
 └── utils/
     ├── format.ts       # Text formatting helpers
@@ -137,6 +141,70 @@ import { exaGetContentsTool } from '../tools/exa-search.js';
 
 ### readFileTool (read_file)
 Read local files from the filesystem.
+```typescript
+import { readFileTool } from '../tools/read-file.js';
+// Returns: { success, path, content, lineCount }
+```
+
+### listPdfsTool (list_pdfs)
+List all PDF files in a directory, sorted by modification date (newest first).
+```typescript
+import { listPdfsTool } from '../tools/list-pdfs.js';
+// Returns: { success, directory, count, files: [{ name, path, modifiedAt, sizeBytes }] }
+```
+
+### readPdfTool (read_pdf)
+Read and extract text from a PDF file. Optionally uses AI (light model) to summarize or extract specific information.
+```typescript
+import { readPdfTool } from '../tools/read-pdf.js';
+// Returns: { success, path, pageCount, textLength, truncated, summary|content }
+```
+
+### readMindsetTool (read_mindset)
+Read the user's investment mindset/philosophy document. Uses path from finance config.
+```typescript
+import { readMindsetTool } from '../tools/mindset.js';
+// Returns: { success, exists, path, content, lineCount }
+```
+
+### saveMindsetTool (save_mindset)
+Save or update the user's investment mindset/philosophy document. Supports append mode.
+```typescript
+import { saveMindsetTool } from '../tools/mindset.js';
+// Returns: { success, path, action, characterCount, lineCount }
+```
+
+### listVaultNotesTool (list_vault_notes)
+List all markdown notes in the configured Obsidian vault. Supports subfolder filtering and sorting.
+```typescript
+import { listVaultNotesTool } from '../tools/obsidian-vault.js';
+// Returns: { success, vaultPath, count, totalCount, files: [{ name, path, modifiedAt, sizeBytes }] }
+```
+
+### readVaultNoteTool (read_vault_note)
+Read the contents of a markdown note from the Obsidian vault. Path validation ensures files stay within vault.
+```typescript
+import { readVaultNoteTool } from '../tools/obsidian-vault.js';
+// Returns: { success, path, content, lineCount, sizeBytes, modifiedAt }
+```
+
+### writeVaultNoteTool (write_vault_note)
+Write or update a markdown note in the Obsidian vault. Includes safety measures:
+- Path validation (must be within vault, must be .md)
+- Size limits (configurable max write size)
+- Automatic backups before overwriting (configurable)
+- Modes: "overwrite", "append", "create-only"
+```typescript
+import { writeVaultNoteTool } from '../tools/obsidian-vault.js';
+// Returns: { success, path, action, sizeBytes, lineCount, backupCreated }
+```
+
+### webSearchTool (web_search)
+Web search stub. Currently returns a placeholder - implement with Serper, Tavily, or Google Custom Search.
+```typescript
+import { webSearchTool } from '../tools/web-search.js';
+// Returns: { success: false, query, results: [], note, suggestedImplementation }
+```
 
 ## Configuration
 
@@ -196,11 +264,28 @@ Project-level configuration stored in the project root. Used for agent-specific 
     "sites": ["aftonbladet.se", "omni.se"],
     "interests": ["technology", "sports"],
     "defaultCount": 5
+  },
+  "obsidian": {
+    "vaultPath": "/path/to/your/obsidian/vault",
+    "maxFileSizeBytes": 102400,
+    "maxWriteSizeBytes": 51200,
+    "backupOnWrite": true,
+    "allowedSubfolders": ["notes", "daily"]
   }
 }
 ```
 
-This is loaded via `getProjectConfig()` and `getNewsConfig()` from `core/project-config.ts`.
+This is loaded via `getProjectConfig()`, `getNewsConfig()`, and `getObsidianConfig()` from `core/project-config.ts`.
+
+#### Obsidian Config Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `vaultPath` | (required) | Absolute path to the Obsidian vault directory |
+| `maxFileSizeBytes` | 102400 (100KB) | Maximum file size that can be read |
+| `maxWriteSizeBytes` | 51200 (50KB) | Maximum content size that can be written |
+| `backupOnWrite` | true | Create `.bak` backup before overwriting files |
+| `allowedSubfolders` | (all) | If set, restrict operations to these subfolders only |
 
 ## Key APIs
 
@@ -292,3 +377,4 @@ Configure sources in `./config.json` under the `news` key.
   - Complete: `✓ fetch_page (1.2s) → 150 lines`
 - Streaming is enabled by default for responsive UX
 - All text output uses Ink's React-based rendering
+- **Always update CLAUDE.md when making changes** - Adding new tools, agents, configurations, or modifying the architecture should be reflected here to keep documentation in sync with the codebase

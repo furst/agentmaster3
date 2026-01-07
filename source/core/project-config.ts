@@ -22,6 +22,18 @@ const NewsConfigSchema = z.object({
 });
 
 /**
+ * Obsidian vault configuration schema
+ */
+const ObsidianConfigSchema = z.object({
+	vaultPath: z.string().describe('Absolute path to the Obsidian vault directory'),
+	// Safety limits
+	maxFileSizeBytes: z.number().default(100 * 1024), // 100KB default max file size
+	maxWriteSizeBytes: z.number().default(50 * 1024), // 50KB default max write size
+	backupOnWrite: z.boolean().default(true), // Create .bak backup before overwriting
+	allowedSubfolders: z.array(z.string()).optional(), // If set, only allow operations in these subfolders
+});
+
+/**
  * Finance agent configuration schema
  */
 const FinanceConfigSchema = z.object({
@@ -69,11 +81,13 @@ const FinanceConfigSchema = z.object({
 const ProjectConfigSchema = z.object({
 	news: NewsConfigSchema.optional(),
 	finance: FinanceConfigSchema.optional(),
+	obsidian: ObsidianConfigSchema.optional(),
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type NewsConfig = z.infer<typeof NewsConfigSchema>;
 export type FinanceConfig = z.infer<typeof FinanceConfigSchema>;
+export type ObsidianConfig = z.infer<typeof ObsidianConfigSchema>;
 
 const CONFIG_FILENAME = 'config.json';
 
@@ -133,6 +147,20 @@ export function getNewsConfig(): NewsConfig {
 export function getFinanceConfig(): FinanceConfig {
 	const projectConfig = getProjectConfig();
 	return FinanceConfigSchema.parse(projectConfig.finance ?? {});
+}
+
+/**
+ * Gets obsidian vault configuration
+ * Throws error if vaultPath is not configured
+ */
+export function getObsidianConfig(): ObsidianConfig {
+	const projectConfig = getProjectConfig();
+	if (!projectConfig.obsidian?.vaultPath) {
+		throw new Error(
+			'Obsidian vault not configured. Add obsidian.vaultPath to ./config.json'
+		);
+	}
+	return ObsidianConfigSchema.parse(projectConfig.obsidian);
 }
 
 /**

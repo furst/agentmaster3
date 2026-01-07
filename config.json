@@ -15,8 +15,20 @@
     "mindsetPath": "./investment-mindset.md",
     "researchSources": {
       "social": ["reddit.com", "twitter.com", "x.com", "news.ycombinator.com"],
-      "news": ["seekingalpha.com", "finance.yahoo.com", "marketwatch.com", "bloomberg.com"],
+      "news": [
+        "seekingalpha.com",
+        "finance.yahoo.com",
+        "marketwatch.com",
+        "bloomberg.com"
+      ],
       "redditSubs": ["investing", "stocks", "wallstreetbets", "options"]
     }
+  },
+  "obsidian": {
+    "vaultPath": "/Users/andreas/Library/Mobile Documents/iCloud~md~obsidian/Documents/andreas_brain_v1",
+    "maxFileSizeBytes": 102400,
+    "maxWriteSizeBytes": 51200,
+    "backupOnWrite": true,
+    "allowedSubfolders": ["Bucket", "Cooksync"]
   }
 }
