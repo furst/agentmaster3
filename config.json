@@ -1,0 +1,7 @@
+{
+  "news": {
+    "sites": ["aftonbladet.se", "omni.se"],
+    "interests": ["technology", "sports"],
+    "defaultCount": 5
+  }
+}
