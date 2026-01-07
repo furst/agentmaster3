@@ -20,6 +20,7 @@ interface ExaSearchResult {
 	author?: string;
 	score: number;
 	id: string;
+	text?: string;
 }
 
 interface ExaSearchResponse {
@@ -45,7 +46,11 @@ interface ExaContentsResponse {
  */
 export const exaSearchTool = defineTool({
 	name: 'exa_search',
-	description: `Search the web using Exa's semantic search engine. Returns relevant URLs and metadata. Use this to find news articles, blog posts, and web content. After searching, use exa_get_contents to fetch the full text of interesting results.`,
+	description: `Search the web using Exa's semantic search engine. Returns relevant URLs and metadata.
+
+Use includeText=true for sites that block direct fetching (Reddit, Twitter). This gets content directly from Exa's index without needing exa_get_contents.
+
+For other sites, you can search first, then use exa_get_contents to fetch full text.`,
 	parameters: z.object({
 		query: z.string().describe('The search query - can be natural language'),
 		numResults: z
@@ -69,6 +74,11 @@ export const exaSearchTool = defineTool({
 			.enum(['news', 'company', 'research paper', 'tweet', 'github', 'pdf'])
 			.optional()
 			.describe('Filter results by content category'),
+		includeText: z
+			.boolean()
+			.optional()
+			.default(false)
+			.describe('Include full text content in results. Use this for sites that block direct fetching (like Reddit). Avoids need for exa_get_contents.'),
 	}),
 	execute: async ({
 		query,
@@ -77,6 +87,7 @@ export const exaSearchTool = defineTool({
 		excludeDomains,
 		startPublishedDate,
 		category,
+		includeText,
 	}) => {
 		try {
 			const apiKey = getExaApiKey();
@@ -101,6 +112,12 @@ export const exaSearchTool = defineTool({
 
 			if (category) {
 				body['category'] = category;
+			}
+
+			if (includeText) {
+				body['contents'] = {
+					text: true,
+				};
 			}
 
 			const response = await fetch(`${EXA_API_BASE}/search`, {
@@ -132,6 +149,7 @@ export const exaSearchTool = defineTool({
 					publishedDate: r.publishedDate,
 					author: r.author,
 					score: r.score,
+					...(r.text && { text: r.text }),
 				})),
 			};
 		} catch (error) {
