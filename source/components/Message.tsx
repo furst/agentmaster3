@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, Static } from 'ink';
 
 export interface MessageProps {
 	/** Message role */
@@ -50,13 +50,18 @@ export interface MessageListProps {
 
 /**
  * Renders a list of conversation messages
+ * Uses Static for completed messages to prevent flickering on long outputs
  */
 export function MessageList({ messages, streamingContent }: MessageListProps) {
 	return (
 		<Box flexDirection="column">
-			{messages.map((message) => (
-				<Message key={message.id} role={message.role} content={message.content} />
-			))}
+			{/* Static renders items once and never re-renders them - prevents flickering */}
+			<Static items={messages}>
+				{(message) => (
+					<Message key={message.id} role={message.role} content={message.content} />
+				)}
+			</Static>
+			{/* Only the streaming content is dynamically rendered */}
 			{streamingContent && (
 				<Message role="assistant" content={streamingContent} isStreaming />
 			)}

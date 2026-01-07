@@ -132,10 +132,17 @@ export function createAgent(config: AgentConfig) {
 						// Tool call completed
 						const existingCall = toolCallEvents.find((e) => e.toolCallId === event.toolCallId);
 						if (existingCall) {
-							existingCall.status = 'complete';
+							// Check if the tool result indicates failure
+							const output = event.output as Record<string, unknown> | null;
+							const isError = output && typeof output === 'object' && 'success' in output && output['success'] === false;
+
+							existingCall.status = isError ? 'error' : 'complete';
 							existingCall.result = event.output;
+							if (isError && 'error' in output) {
+								existingCall.error = String(output['error']);
+							}
 							existingCall.endTime = Date.now();
-							onEvent({ type: 'tool-call-complete', toolCall: existingCall });
+							onEvent({ type: isError ? 'tool-call-error' : 'tool-call-complete', toolCall: existingCall });
 						}
 						break;
 					}

@@ -3,5 +3,19 @@
     "sites": ["aftonbladet.se", "omni.se"],
     "interests": ["technology", "sports"],
     "defaultCount": 5
+  },
+  "finance": {
+    "lightModel": "google:gemini-3-flash-preview",
+    "strongModel": "anthropic:claude-sonnet-4-5-20250514",
+    "newsletterDirectory": "/Users/andreas/Library/CloudStorage/Dropbox/dokument/Stockpicker",
+    "mindsetPath": "./investment-mindset.md",
+    "researchSources": {
+      "social": ["reddit.com", "twitter.com", "x.com", "news.ycombinator.com"],
+      "news": ["seekingalpha.com", "finance.yahoo.com", "marketwatch.com", "bloomberg.com"],
+      "redditSubs": ["investing", "stocks", "wallstreetbets", "options"]
+    },
+    "watchlist": [
+      { "symbol": "GOOGL", "name": "Alphabet", "notes": "AI potential" }
+    ]
   }
 }

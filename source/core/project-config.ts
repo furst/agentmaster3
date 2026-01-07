@@ -22,15 +22,61 @@ const NewsConfigSchema = z.object({
 });
 
 /**
+ * Finance agent configuration schema
+ */
+const FinanceConfigSchema = z.object({
+	// Model configuration (provider:model format)
+	lightModel: z.string().default('google:gemini-3-flash-preview'),
+	strongModel: z.string().default('anthropic:claude-sonnet-4-5-20250514'),
+
+	// Local data sources
+	newsletterDirectory: z.string().default('./newsletters'),
+	mindsetPath: z.string().default('./investment-mindset.md'),
+
+	// Online research sources
+	researchSources: z
+		.object({
+			social: z
+				.array(z.string())
+				.default(['reddit.com', 'twitter.com', 'x.com', 'news.ycombinator.com']),
+			news: z
+				.array(z.string())
+				.default([
+					'seekingalpha.com',
+					'finance.yahoo.com',
+					'marketwatch.com',
+					'bloomberg.com',
+				]),
+			redditSubs: z
+				.array(z.string())
+				.default(['investing', 'stocks', 'wallstreetbets', 'options']),
+		})
+		.default({}),
+
+	// Personal portfolio watchlist
+	watchlist: z
+		.array(
+			z.object({
+				symbol: z.string(),
+				name: z.string(),
+				notes: z.string().optional(),
+			})
+		)
+		.default([]),
+});
+
+/**
  * Project-level configuration schema
  * This is separate from user-level config (~/.config/agentmaster/)
  */
 const ProjectConfigSchema = z.object({
 	news: NewsConfigSchema.optional(),
+	finance: FinanceConfigSchema.optional(),
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type NewsConfig = z.infer<typeof NewsConfigSchema>;
+export type FinanceConfig = z.infer<typeof FinanceConfigSchema>;
 
 const CONFIG_FILENAME = 'config.json';
 
@@ -82,6 +128,14 @@ export function getProjectConfig(): ProjectConfig {
 export function getNewsConfig(): NewsConfig {
 	const projectConfig = getProjectConfig();
 	return NewsConfigSchema.parse(projectConfig.news ?? {});
+}
+
+/**
+ * Gets finance-specific configuration with defaults
+ */
+export function getFinanceConfig(): FinanceConfig {
+	const projectConfig = getProjectConfig();
+	return FinanceConfigSchema.parse(projectConfig.finance ?? {});
 }
 
 /**
