@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { streamResponse, type CoreMessage, type CoreTool } from './llm.js';
+import { streamResponse, type CoreMessage, type CoreTool, type ReasoningConfig } from './llm.js';
 import { getAgentConfig } from './config.js';
 
 export interface AgentConfig {
@@ -8,6 +8,7 @@ export interface AgentConfig {
 	tools?: Record<string, CoreTool>;
 	maxIterations?: number;
 	model?: string;
+	reasoning?: ReasoningConfig;
 }
 
 export interface Message {
@@ -65,7 +66,7 @@ function generateMessageId(): string {
  * Creates a reusable agent instance with conversation history and tool support
  */
 export function createAgent(config: AgentConfig) {
-	const { name, systemPrompt, tools = {}, maxIterations: configMaxIterations, model: configModel } = config;
+	const { name, systemPrompt, tools = {}, maxIterations: configMaxIterations, model: configModel, reasoning } = config;
 
 	// Merge with agent-specific config from file
 	const agentConfig = getAgentConfig(name);
@@ -103,6 +104,7 @@ export function createAgent(config: AgentConfig) {
 				tools: Object.keys(tools).length > 0 ? tools : undefined,
 				maxSteps: maxIterations,
 				abortSignal: abortController.signal,
+				reasoning,
 			});
 
 			// Use fullStream to get all events including tool calls

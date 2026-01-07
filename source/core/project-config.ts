@@ -29,6 +29,14 @@ const FinanceConfigSchema = z.object({
 	lightModel: z.string().default('google:gemini-3-flash-preview'),
 	strongModel: z.string().default('anthropic:claude-sonnet-4-5-20250514'),
 
+	// Reasoning/thinking configuration
+	reasoning: z
+		.object({
+			enabled: z.boolean().default(false),
+			budgetTokens: z.number().default(10000),
+		})
+		.default({}),
+
 	// Local data sources
 	newsletterDirectory: z.string().default('./newsletters'),
 	mindsetPath: z.string().default('./investment-mindset.md'),
@@ -52,17 +60,6 @@ const FinanceConfigSchema = z.object({
 				.default(['investing', 'stocks', 'wallstreetbets', 'options']),
 		})
 		.default({}),
-
-	// Personal portfolio watchlist
-	watchlist: z
-		.array(
-			z.object({
-				symbol: z.string(),
-				name: z.string(),
-				notes: z.string().optional(),
-			})
-		)
-		.default([]),
 });
 
 /**

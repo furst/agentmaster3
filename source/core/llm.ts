@@ -29,6 +29,11 @@ export function createModel(model?: string) {
 	return anthropic(model ?? config.defaultModel);
 }
 
+export interface ReasoningConfig {
+	enabled: boolean;
+	budgetTokens?: number;
+}
+
 export interface StreamOptions {
 	model?: string;
 	system?: string;
@@ -37,6 +42,7 @@ export interface StreamOptions {
 	maxSteps?: number;
 	onStepFinish?: (event: StepFinishEvent) => void;
 	abortSignal?: AbortSignal;
+	reasoning?: ReasoningConfig;
 }
 
 export interface StepFinishEvent {
@@ -65,9 +71,21 @@ export interface ToolResultEntry {
 export async function streamResponse(
 	options: StreamOptions
 ) {
-	const { model, system, messages, tools, maxSteps = 10, onStepFinish, abortSignal } = options;
+	const { model, system, messages, tools, maxSteps = 10, onStepFinish, abortSignal, reasoning } = options;
 
 	const llm = createModel(model);
+
+	// Build provider options for reasoning/thinking
+	const providerOptions = reasoning?.enabled
+		? {
+				anthropic: {
+					thinking: {
+						type: 'enabled' as const,
+						budgetTokens: reasoning.budgetTokens ?? 10000,
+					},
+				},
+			}
+		: undefined;
 
 	const result = streamText({
 		model: llm,
@@ -76,6 +94,7 @@ export async function streamResponse(
 		tools,
 		stopWhen: stepCountIs(maxSteps),
 		abortSignal,
+		providerOptions,
 		onStepFinish: onStepFinish
 			? (event) => {
 					// Map tool calls - handle both typed and dynamic

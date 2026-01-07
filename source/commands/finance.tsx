@@ -28,12 +28,6 @@ function buildSystemPrompt(): string {
 Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
     : "";
 
-  const watchlistSection =
-    config.watchlist.length > 0
-      ? `\n\n**User's Watchlist** (companies of interest):
-${config.watchlist.map((w) => `- ${w.symbol}: ${w.name}${w.notes ? ` (${w.notes})` : ""}`).join("\n")}`
-      : "";
-
   const socialDomains = config.researchSources.social.join(", ");
   const newsDomains = config.researchSources.news.join(", ");
   const redditSubs = config.researchSources.redditSubs.join(", ");
@@ -73,7 +67,7 @@ ${config.watchlist.map((w) => `- ${w.symbol}: ${w.name}${w.notes ? ` (${w.notes}
 **Social/Forums**: ${socialDomains}
 **Financial News**: ${newsDomains}
 **Reddit Subreddits**: r/${redditSubs.replace(/, /g, ", r/")}
-${newsletterSection}${watchlistSection}
+${newsletterSection}
 
 ## Output Style
 
@@ -85,6 +79,8 @@ ${newsletterSection}${watchlistSection}
 }
 
 export default function Finance({ options }: Props) {
+  const config = getFinanceConfig();
+
   const agent = useMemo(
     () =>
       createAgent({
@@ -100,8 +96,11 @@ export default function Finance({ options }: Props) {
           jinaReaderTool,
         ]),
         maxIterations: 15,
+        reasoning: config.reasoning.enabled
+          ? { enabled: true, budgetTokens: config.reasoning.budgetTokens }
+          : undefined,
       }),
-    []
+    [config.reasoning.enabled, config.reasoning.budgetTokens]
   );
 
   return (
