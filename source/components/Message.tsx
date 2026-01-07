@@ -50,19 +50,23 @@ export interface MessageListProps {
 
 /**
  * Renders a list of conversation messages
- * Uses Static for completed messages to prevent flickering on long outputs
+ * Uses Static for completed messages to prevent duplication in terminal buffer
  */
 export function MessageList({ messages, streamingContent }: MessageListProps) {
+	// Don't show streaming content if it's already been added to messages
+	// This prevents duplication during the state transition
+	const lastMessage = messages[messages.length - 1];
+	const showStreaming = streamingContent &&
+		!(lastMessage?.role === 'assistant' && lastMessage.content === streamingContent);
+
 	return (
 		<Box flexDirection="column">
-			{/* Static renders items once and never re-renders them - prevents flickering */}
 			<Static items={messages}>
 				{(message) => (
 					<Message key={message.id} role={message.role} content={message.content} />
 				)}
 			</Static>
-			{/* Only the streaming content is dynamically rendered */}
-			{streamingContent && (
+			{showStreaming && (
 				<Message role="assistant" content={streamingContent} isStreaming />
 			)}
 		</Box>

@@ -2,9 +2,9 @@ import React, { useMemo } from "react";
 import { z } from "zod";
 import { createAgent } from "../core/agent.js";
 import { AgentShell } from "../components/AgentShell.js";
-import { jinaReaderTool } from "../tools/jina-reader.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getNewsConfig } from "../core/project-config.js";
+import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
 
 export const options = z.object({
   prompt: z
@@ -35,12 +35,11 @@ ${config.interests.map((i) => `- ${i}`).join("\n")}`
   return `You are a concise news assistant. Be brief and factual - no opinions, no verbose intros/outros.
 
 Workflow:
-1. Fetch the homepage of configured news sites (usually just ONE fetch is enough)
-2. Summarize the headlines you find - the homepage already has article titles and short descriptions
-3. ONLY fetch individual articles if required(lack of information in the summary)
+1. Use exa_search to find recent news (use includeDomains to filter by configured sites)
+2. Use exa_get_contents to get full article text if needed
+3. Summarize the headlines - usually search results have enough info
 
 Important:
-- The homepage usually contains enough info for a news summary - don't over-fetch
 - No commentary like "I'll fetch..." or "The most interesting story is..."
 - Just list the news items directly
 ${sitesSection}${interestsSection}
@@ -55,7 +54,7 @@ export default function News({ options }: Props) {
       createAgent({
         name: "news",
         systemPrompt: buildSystemPrompt(),
-        tools: createToolsRecord([jinaReaderTool]),
+        tools: createToolsRecord([exaSearchTool, exaGetContentsTool]),
         maxIterations: 15,
       }),
     []

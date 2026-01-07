@@ -189,14 +189,25 @@ import { readVaultNoteTool } from '../tools/obsidian-vault.js';
 ```
 
 ### writeVaultNoteTool (write_vault_note)
-Write or update a markdown note in the Obsidian vault. Includes safety measures:
-- Path validation (must be within vault, must be .md)
-- Size limits (configurable max write size)
-- Automatic backups before overwriting (configurable)
-- Modes: "overwrite", "append", "create-only"
+Write or update a markdown note in the Obsidian vault. New files automatically get:
+- **Frontmatter** with tags (inferred from content or explicit), status, type fields
+- **References section** at the end
+- **Auto-tagging**: recipes get `cooking, recipe`; code gets `tech, code`; guides get `guide`
+
+Safety measures: path validation, size limits, automatic backups.
 ```typescript
 import { writeVaultNoteTool } from '../tools/obsidian-vault.js';
-// Returns: { success, path, action, sizeBytes, lineCount, backupCreated }
+// Parameters: { path, content, mode?, tags?, type?, skipFrontmatter? }
+// Returns: { success, path, action, sizeBytes, lineCount, backupCreated, tags? }
+```
+
+### searchVaultTool (search_vault)
+Search through note contents with fuzzy matching and multi-word AND queries. All words must match (with typo tolerance).
+```typescript
+import { searchVaultTool } from '../tools/obsidian-vault.js';
+// Parameters: { query, subfolder?, fuzzyThreshold? (0-1, default 0.4), maxResults? }
+// Returns: { success, query, queryWords, resultCount, results: [{ path, name, score, matchedWords, preview }] }
+// Example: "beef recipe" finds notes containing both "beef" AND "recipe" (or fuzzy variants like "recipes")
 ```
 
 ### webSearchTool (web_search)

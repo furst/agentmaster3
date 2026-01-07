@@ -1,22 +1,28 @@
-import React, { useMemo } from 'react';
-import { z } from 'zod';
-import { createAgent } from '../core/agent.js';
-import { AgentShell } from '../components/AgentShell.js';
-import { createToolsRecord } from '../core/tools.js';
-import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool } from '../tools/obsidian-vault.js';
+import React, { useMemo } from "react";
+import { z } from "zod";
+import { createAgent } from "../core/agent.js";
+import { AgentShell } from "../components/AgentShell.js";
+import { createToolsRecord } from "../core/tools.js";
+import {
+  listVaultNotesTool,
+  readVaultNoteTool,
+  writeVaultNoteTool,
+  searchVaultTool,
+} from "../tools/obsidian-vault.js";
+import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
 
 /**
  * Command options using Zod schema
  */
 export const options = z.object({
-	prompt: z
-		.string()
-		.optional()
-		.describe('Initial prompt to send to the assistant'),
+  prompt: z
+    .string()
+    .optional()
+    .describe("Initial prompt to send to the assistant"),
 });
 
 type Props = {
-	options: z.infer<typeof options>;
+  options: z.infer<typeof options>;
 };
 
 const SYSTEM_PROMPT = `You are a helpful, friendly, and knowledgeable assistant.
@@ -39,15 +45,25 @@ You have access to the user's Obsidian vault for storing and retrieving notes. U
 
 - User says "save this", "store this", "remember this", "add to my notes" → write_vault_note
 - User asks for a recipe, guide, or reference material → offer to save it to their vault
-- User says "get my notes on...", "find my...", "what did I save about..." → list_vault_notes + read_vault_note
+- User says "get my notes on...", "find my...", "what did I save about..." → search_vault to find by content, then read_vault_note
 - User wants to update or add to existing notes → read first, then write with append mode
 
 When saving content:
-- Use descriptive filenames (e.g., "recipes/chocolate-cake.md", "guides/git-commands.md")
+- Always save to the "Bucket" folder (e.g., "Bucket/Chocolate Cake.md")
+- Use the content's title as the filename
+- Keep spaces in filenames - Obsidian handles them well and they look nicer
 - Format content as clean markdown
-- Ask the user where to save if unclear (or suggest a sensible default path)
 
 When performing vault operations, be brief and factual. Don't comment on or evaluate the content of notes (no "nice recipe!", "interesting notes!", etc). Just confirm the action was completed.
+
+## Web Search & Content
+
+You can search the web and fetch content from URLs:
+
+- User asks about current events, recent info, or "search for..." → exa_search
+- User provides a URL → exa_get_contents
+
+When fetching recipes or useful content from the web, offer to save it to the vault.
 
 Always aim to be helpful while being accurate and thoughtful in your responses.`;
 
@@ -55,29 +71,32 @@ Always aim to be helpful while being accurate and thoughtful in your responses.`
  * Ask command - general assistant with Obsidian vault tools
  */
 export default function Ask({ options }: Props) {
-	// Create agent instance (memoized to prevent recreation)
-	const agent = useMemo(
-		() =>
-			createAgent({
-				name: 'ask',
-				systemPrompt: SYSTEM_PROMPT,
-				tools: createToolsRecord([
-					listVaultNotesTool,
-					readVaultNoteTool,
-					writeVaultNoteTool,
-				]),
-			}),
-		[]
-	);
+  // Create agent instance (memoized to prevent recreation)
+  const agent = useMemo(
+    () =>
+      createAgent({
+        name: "ask",
+        systemPrompt: SYSTEM_PROMPT,
+        tools: createToolsRecord([
+          listVaultNotesTool,
+          readVaultNoteTool,
+          writeVaultNoteTool,
+          searchVaultTool,
+          exaSearchTool,
+          exaGetContentsTool,
+        ]),
+      }),
+    []
+  );
 
-	return (
-		<AgentShell
-			agent={agent}
-			name="Ask"
-			color="cyan"
-			placeholder="Ask me anything..."
-			initialPrompt={options.prompt}
-			welcomeMessage="Welcome! I'm a helpful assistant. Ask me anything, or type a message to get started."
-		/>
-	);
+  return (
+    <AgentShell
+      agent={agent}
+      name="Ask"
+      color="cyan"
+      placeholder="Ask me anything..."
+      initialPrompt={options.prompt}
+      welcomeMessage="Welcome! I'm a helpful assistant. Ask me anything, or type a message to get started."
+    />
+  );
 }

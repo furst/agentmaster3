@@ -10,7 +10,6 @@ import { listPdfsTool } from "../tools/list-pdfs.js";
 import { readPdfTool } from "../tools/read-pdf.js";
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
 import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
-import { jinaReaderTool } from "../tools/jina-reader.js";
 
 export const options = z.object({
   prompt: z.string().optional().describe("Initial prompt or question"),
@@ -61,7 +60,6 @@ Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
 - **save_mindset**: Update the user's investment philosophy
 - **exa_search**: Search the web (filter by domain for specific sources)
 - **exa_get_contents**: Fetch full article/thread content from URLs
-- **fetch_page**: Fetch any webpage as clean markdown
 
 ## Research Sources
 
@@ -94,7 +92,6 @@ export default function Finance({ options }: Props) {
           saveMindsetTool,
           exaSearchTool,
           exaGetContentsTool,
-          jinaReaderTool,
         ]),
         maxIterations: 15,
         reasoning: config.reasoning.enabled

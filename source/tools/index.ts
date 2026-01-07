@@ -9,7 +9,7 @@ export { jinaReaderTool } from './jina-reader.js';
 export { listPdfsTool } from './list-pdfs.js';
 export { readPdfTool } from './read-pdf.js';
 export { readMindsetTool, saveMindsetTool } from './mindset.js';
-export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool } from './obsidian-vault.js';
+export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 
 import { readFileTool } from './read-file.js';
 import { webSearchTool } from './web-search.js';
@@ -18,7 +18,7 @@ import { jinaReaderTool } from './jina-reader.js';
 import { listPdfsTool } from './list-pdfs.js';
 import { readPdfTool } from './read-pdf.js';
 import { readMindsetTool, saveMindsetTool } from './mindset.js';
-import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool } from './obsidian-vault.js';
+import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 import { createToolsRecord } from '../core/tools.js';
 
 /**
@@ -37,6 +37,7 @@ export const allTools = [
 	listVaultNotesTool,
 	readVaultNoteTool,
 	writeVaultNoteTool,
+	searchVaultTool,
 ];
 
 /**
@@ -51,7 +52,7 @@ export const toolCategories = {
 	filesystem: [readFileTool, listPdfsTool, readPdfTool],
 	web: [webSearchTool, exaSearchTool, exaGetContentsTool, jinaReaderTool],
 	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool],
-	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool],
+	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
 } as const;
 
 /**
