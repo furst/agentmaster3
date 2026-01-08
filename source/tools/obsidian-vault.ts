@@ -249,7 +249,7 @@ function inferTags(content: string, path: string): string[] {
 		contentLower.includes('prep time') ||
 		contentLower.includes('cook time')
 	) {
-		tags.push('cooking', 'recipe');
+		tags.push('cooking/recipe');
 	}
 
 	// Guide/tutorial detection
@@ -331,8 +331,12 @@ export const writeVaultNoteTool = defineTool({
 			.optional()
 			.default(false)
 			.describe('Skip adding frontmatter (useful for raw content or when frontmatter already exists)'),
+		sourceUrl: z
+			.string()
+			.optional()
+			.describe('Source URL to include in the References section (e.g., when saving content from a webpage)'),
 	}),
-	execute: async ({ path, content, mode, tags, type, appendSeparator, skipFrontmatter }) => {
+	execute: async ({ path, content, mode, tags, type, appendSeparator, skipFrontmatter, sourceUrl }) => {
 		try {
 			const config = getObsidianConfig();
 
@@ -394,7 +398,8 @@ export const writeVaultNoteTool = defineTool({
 				// New file - add frontmatter and references section
 				appliedTags = tags ?? inferTags(content, path);
 				const frontmatter = generateFrontmatter(appliedTags, type);
-				const referencesSection = '\n\n---\n# References\n';
+				const sourceRef = sourceUrl ? `- ${sourceUrl}\n` : '';
+				const referencesSection = `\n\n---\n# References\n${sourceRef}`;
 				finalContent = frontmatter + content + referencesSection;
 			}
 
