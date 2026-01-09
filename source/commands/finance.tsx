@@ -11,6 +11,8 @@ import { readPdfTool } from "../tools/read-pdf.js";
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
 import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
+import { createPlanTool, updatePlanStepTool, readPlanTool } from "../tools/agent-planning.js";
+import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from "../tools/research-notes.js";
 
 export const options = z.object({
   prompt: z.string().optional().describe("Initial prompt or question"),
@@ -54,6 +56,17 @@ Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
 - For Reddit specifically: use exa_search with includeDomains=["reddit.com"] AND includeText=true (Reddit blocks direct fetching, so get content from Exa's index)
 - Include subreddit in your query (e.g., "r/investing NVDA")
 
+## Complex Task Workflow
+
+For complex or multi-step research tasks (portfolio analysis, deep company research, market analysis):
+
+1. **Create a plan first**: Use \`create_plan\` to break down the task into steps
+2. **Work through steps systematically**: Update each step as you progress with \`update_plan_step\`
+3. **Save important findings**: Use \`save_research_note\` to store key information you'll need later
+4. **Track progress**: Use \`read_plan\` to review your progress if needed
+
+This ensures thorough analysis and prevents missing important steps. You can take your time and work methodically through complex requests.
+
 ## Tools Available
 
 - **read_holdings**: Read the user's current stock holdings from saved data
@@ -65,6 +78,14 @@ Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
 - **save_mindset**: Update the user's investment philosophy
 - **exa_search**: Search the web (filter by domain for specific sources)
 - **exa_get_contents**: Fetch full article/thread content from URLs
+
+### Planning & Research Storage
+- **create_plan**: Create a step-by-step research plan for complex tasks
+- **update_plan_step**: Mark steps complete, add findings, or abandon plan
+- **read_plan**: Check current plan status and progress
+- **save_research_note**: Save important findings for later reference
+- **read_research_notes**: Read back saved research notes
+- **list_research_notes**: List all saved research notes
 
 ## Research Sources
 
@@ -118,7 +139,9 @@ export default function Finance({ options }: Props) {
       createAgent({
         name: "finance",
         systemPrompt: buildSystemPrompt(),
+        model: config.strongModel,
         tools: createToolsRecord([
+          // Research & data tools
           listPdfsTool,
           readPdfTool,
           readMindsetTool,
@@ -128,13 +151,20 @@ export default function Finance({ options }: Props) {
           parseHoldingsImageTool,
           readHoldingsTool,
           listHoldingsImagesTool,
+          // Planning & notes tools
+          createPlanTool,
+          updatePlanStepTool,
+          readPlanTool,
+          saveResearchNoteTool,
+          readResearchNotesTool,
+          listResearchNotesTool,
         ]),
         maxIterations: 15,
         reasoning: config.reasoning.enabled
           ? { enabled: true, budgetTokens: config.reasoning.budgetTokens }
           : undefined,
       }),
-    [config.reasoning.enabled, config.reasoning.budgetTokens]
+    [config.strongModel, config.reasoning.enabled, config.reasoning.budgetTokens]
   );
 
   return (

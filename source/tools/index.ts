@@ -11,6 +11,8 @@ export { readPdfTool } from './read-pdf.js';
 export { readMindsetTool, saveMindsetTool } from './mindset.js';
 export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 export { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
+export { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
+export { createPlanTool, updatePlanStepTool, readPlanTool } from './agent-planning.js';
 
 import { readFileTool } from './read-file.js';
 import { webSearchTool } from './web-search.js';
@@ -21,6 +23,8 @@ import { readPdfTool } from './read-pdf.js';
 import { readMindsetTool, saveMindsetTool } from './mindset.js';
 import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
+import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
+import { createPlanTool, updatePlanStepTool, readPlanTool } from './agent-planning.js';
 import { createToolsRecord } from '../core/tools.js';
 
 /**
@@ -43,6 +47,12 @@ export const allTools = [
 	parseHoldingsImageTool,
 	readHoldingsTool,
 	listHoldingsImagesTool,
+	saveResearchNoteTool,
+	readResearchNotesTool,
+	listResearchNotesTool,
+	createPlanTool,
+	updatePlanStepTool,
+	readPlanTool,
 ];
 
 /**
@@ -58,6 +68,7 @@ export const toolCategories = {
 	web: [webSearchTool, exaSearchTool, exaGetContentsTool, jinaReaderTool],
 	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool, parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool],
 	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
+	planning: [createPlanTool, updatePlanStepTool, readPlanTool, saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
 } as const;
 
 /**

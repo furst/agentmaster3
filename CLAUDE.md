@@ -40,6 +40,9 @@ source/
 │   ├── read-pdf.ts     # Read and extract/summarize PDF content
 │   ├── mindset.ts      # Read/save user investment philosophy
 │   ├── obsidian-vault.ts # Read/write markdown notes in Obsidian vault
+│   ├── holdings.ts     # Parse and read stock holdings
+│   ├── research-notes.ts # Save/read research findings
+│   ├── agent-planning.ts # Plan creation and tracking for complex tasks
 │   └── index.ts        # Tool registry
 └── utils/
     ├── format.ts       # Text formatting helpers
@@ -233,6 +236,53 @@ import { searchVaultTool } from '../tools/obsidian-vault.js';
 // Parameters: { query, subfolder?, fuzzyThreshold? (0-1, default 0.4), maxResults? }
 // Returns: { success, query, queryWords, resultCount, results: [{ path, name, score, matchedWords, preview }] }
 // Example: "beef recipe" finds notes containing both "beef" AND "recipe" (or fuzzy variants like "recipes")
+```
+
+### createPlanTool (create_plan)
+Create a structured research plan with numbered steps. For complex multi-step tasks.
+```typescript
+import { createPlanTool } from '../tools/agent-planning.js';
+// Parameters: { title, objective, steps: string[] }
+// Returns: { success, planId, title, objective, stepCount, steps }
+```
+
+### updatePlanStepTool (update_plan_step)
+Update plan step status, add findings, or manage the entire plan.
+```typescript
+import { updatePlanStepTool } from '../tools/agent-planning.js';
+// Parameters: { stepId?, status?, findings?, abandonPlan?, completePlan? }
+// Returns: { success, action, stepId, newStatus, progress }
+```
+
+### readPlanTool (read_plan)
+Read current research plan status and progress.
+```typescript
+import { readPlanTool } from '../tools/agent-planning.js';
+// Returns: { success, hasActivePlan, planId, title, objective, status, progress, steps }
+```
+
+### saveResearchNoteTool (save_research_note)
+Save research findings to a note file for later reference.
+```typescript
+import { saveResearchNoteTool } from '../tools/research-notes.js';
+// Parameters: { topic, content, tags?, noteId? }
+// Returns: { success, noteId, path, action, topic, contentLength }
+```
+
+### readResearchNotesTool (read_research_notes)
+Read research notes by ID or search by topic.
+```typescript
+import { readResearchNotesTool } from '../tools/research-notes.js';
+// Parameters: { noteId?, topicSearch? }
+// Returns: { success, notes: [{ id, topic, tags, updatedAt, contentPreview }] }
+```
+
+### listResearchNotesTool (list_research_notes)
+List all saved research notes with optional tag filtering.
+```typescript
+import { listResearchNotesTool } from '../tools/research-notes.js';
+// Parameters: { tag? }
+// Returns: { success, directory, noteCount, notes }
 ```
 
 ### webSearchTool (web_search)

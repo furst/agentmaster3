@@ -1,4 +1,5 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, generateText, type ModelMessage, type Tool, stepCountIs } from 'ai';
 import { getConfig, getApiKey } from './config.js';
 
@@ -20,13 +21,47 @@ export function createAnthropicProvider() {
 }
 
 /**
+ * Creates a Google Generative AI provider instance
+ */
+export function createGoogleProvider() {
+	const apiKey = process.env['GOOGLE_GENERATIVE_AI_API_KEY'] || process.env['GOOGLE_AI_API_KEY'];
+	return createGoogleGenerativeAI({ apiKey });
+}
+
+/**
+ * Parses a model string in format "provider:model" and returns the appropriate model instance
+ * Supported providers: anthropic, google
+ * @param modelString Model string like "google:gemini-3-pro-preview" or "anthropic:claude-sonnet-4-5-20250514"
+ */
+export function parseModelString(modelString: string) {
+	const [provider, ...modelParts] = modelString.split(':');
+	const modelId = modelParts.join(':'); // Rejoin in case model name has colons
+
+	switch (provider) {
+		case 'google': {
+			const google = createGoogleProvider();
+			return google(modelId);
+		}
+		case 'anthropic': {
+			const anthropic = createAnthropicProvider();
+			return anthropic(modelId);
+		}
+		default: {
+			// If no provider prefix, assume Anthropic
+			const anthropic = createAnthropicProvider();
+			return anthropic(modelString);
+		}
+	}
+}
+
+/**
  * Creates a language model instance with the specified or default model
- * @param model Optional model ID override
+ * @param model Optional model ID override (supports "provider:model" format)
  */
 export function createModel(model?: string) {
 	const config = getConfig();
-	const anthropic = createAnthropicProvider();
-	return anthropic(model ?? config.defaultModel);
+	const modelString = model ?? config.defaultModel;
+	return parseModelString(modelString);
 }
 
 export interface ReasoningConfig {

@@ -6,14 +6,14 @@
   },
   "finance": {
     "lightModel": "google:gemini-3-flash-preview",
-    "strongModel": "anthropic:claude-sonnet-4-5-20250514",
+    "strongModel": "google:gemini-3-pro-preview",
     "reasoning": {
-      "enabled": true,
-      "budgetTokens": 10000
+      "enabled": false
     },
     "newsletterDirectory": "/Users/andreas/Library/CloudStorage/Dropbox/dokument/Stockpicker",
     "mindsetPath": "./investment-mindset.md",
     "holdingsDirectory": "./data/holdings",
+    "researchDirectory": "./data/research",
     "researchSources": {
       "social": ["reddit.com", "twitter.com", "x.com", "news.ycombinator.com"],
       "news": [

@@ -53,6 +53,7 @@ const FinanceConfigSchema = z.object({
 	newsletterDirectory: z.string().default('./newsletters'),
 	mindsetPath: z.string().default('./investment-mindset.md'),
 	holdingsDirectory: z.string().optional().default('./data/holdings').describe('Directory for holdings screenshots and parsed data'),
+	researchDirectory: z.string().default('./data/research').describe('Directory for research notes and plans'),
 
 	// Online research sources
 	researchSources: z
