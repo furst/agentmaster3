@@ -10,6 +10,7 @@ import { listPdfsTool } from "../tools/list-pdfs.js";
 import { readPdfTool } from "../tools/read-pdf.js";
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
 import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
+import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
 
 export const options = z.object({
   prompt: z.string().optional().describe("Initial prompt or question"),
@@ -35,11 +36,12 @@ Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
 
 ## Your Capabilities
 
-1. **Newsletter Analysis**: Read and summarize PDF investment newsletters from the user's collection.
-2. **Social Research**: Search Reddit (r/${redditSubs.replace(/, /g, ", r/")}), Twitter/X, and HackerNews for investment discussions.
-3. **Financial News**: Search ${newsDomains} for professional analysis and market news.
-4. **Company Research**: Research companies using web search, fetch investor relations pages, earnings reports, and news.
-5. **Investment Mindset**: Help the user develop and maintain their investment philosophy and decision-making framework.
+1. **Portfolio Analysis**: Read the user's current holdings from parsed screenshots. Parse new holdings screenshots when uploaded.
+2. **Newsletter Analysis**: Read and summarize PDF investment newsletters from the user's collection.
+3. **Social Research**: Search Reddit (r/${redditSubs.replace(/, /g, ", r/")}), Twitter/X, and HackerNews for investment discussions.
+4. **Financial News**: Search ${newsDomains} for professional analysis and market news.
+5. **Company Research**: Research companies using web search, fetch investor relations pages, earnings reports, and news.
+6. **Investment Mindset**: Help the user develop and maintain their investment philosophy and decision-making framework.
 
 ## Guidelines
 
@@ -54,6 +56,9 @@ Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
 
 ## Tools Available
 
+- **read_holdings**: Read the user's current stock holdings from saved data
+- **parse_holdings_image**: Parse a new holdings screenshot (uses AI vision). Call when user uploads a new screenshot.
+- **list_holdings_images**: List available holdings screenshots
 - **list_pdfs**: List available PDF newsletters in a directory
 - **read_pdf**: Read and extract/summarize text from PDF files (uses a light AI model for extraction)
 - **read_mindset**: Read the user's investment philosophy
@@ -120,6 +125,9 @@ export default function Finance({ options }: Props) {
           saveMindsetTool,
           exaSearchTool,
           exaGetContentsTool,
+          parseHoldingsImageTool,
+          readHoldingsTool,
+          listHoldingsImagesTool,
         ]),
         maxIterations: 15,
         reasoning: config.reasoning.enabled

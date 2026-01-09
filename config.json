@@ -13,6 +13,7 @@
     },
     "newsletterDirectory": "/Users/andreas/Library/CloudStorage/Dropbox/dokument/Stockpicker",
     "mindsetPath": "./investment-mindset.md",
+    "holdingsDirectory": "./data/holdings",
     "researchSources": {
       "social": ["reddit.com", "twitter.com", "x.com", "news.ycombinator.com"],
       "news": [

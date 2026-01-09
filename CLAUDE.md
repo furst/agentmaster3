@@ -176,6 +176,29 @@ import { saveMindsetTool } from '../tools/mindset.js';
 // Returns: { success, path, action, characterCount, lineCount }
 ```
 
+### parseHoldingsImageTool (parse_holdings_image)
+Parse a screenshot of holdings (from Avanza) using AI vision (Gemini Flash). Extracts holdings data and saves to holdings.json.
+```typescript
+import { parseHoldingsImageTool } from '../tools/holdings.js';
+// Parameters: { imageName?: string } - if not provided, uses most recent image
+// Returns: { success, parsedFrom, savedTo, holdingsCount, totalValue, holdings }
+```
+
+### readHoldingsTool (read_holdings)
+Read the user's current stock holdings from the saved holdings.json file.
+```typescript
+import { readHoldingsTool } from '../tools/holdings.js';
+// Parameters: { ticker?: string } - optional filter by ticker/name
+// Returns: { success, updatedAt, source, holdingsCount, totalValue, holdings }
+```
+
+### listHoldingsImagesTool (list_holdings_images)
+List available holdings screenshots in the holdings directory.
+```typescript
+import { listHoldingsImagesTool } from '../tools/holdings.js';
+// Returns: { success, directory, imageCount, images: [{ name, modifiedAt }] }
+```
+
 ### listVaultNotesTool (list_vault_notes)
 List all markdown notes in the configured Obsidian vault. Supports subfolder filtering and sorting.
 ```typescript
