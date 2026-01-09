@@ -8,9 +8,9 @@ import { join } from 'node:path';
  */
 const ModelsConfigSchema = z.object({
 	// Default light model for fast, cheap tasks (PDF summarization, image parsing, etc.)
-	light: z.string().default('google:gemini-2.5-flash-preview-05-20'),
+	light: z.string().default('google:gemini-3-flash-preview'),
 	// Default strong model for complex reasoning tasks
-	strong: z.string().default('google:gemini-2.5-pro-preview-05-20'),
+	strong: z.string().default('google:gemini-3-pro-preview'),
 	// Reasoning/thinking configuration
 	reasoning: z
 		.object({
@@ -56,8 +56,9 @@ const ObsidianConfigSchema = z.object({
  */
 const FinanceConfigSchema = z.object({
 	// Model configuration (provider:model format)
-	lightModel: z.string().default('google:gemini-3-flash-preview'),
-	strongModel: z.string().default('anthropic:claude-sonnet-4-5-20250514'),
+	// These are optional - if not set, falls back to shared models config
+	lightModel: z.string().optional(),
+	strongModel: z.string().optional(),
 
 	// Reasoning/thinking configuration
 	reasoning: z
@@ -177,7 +178,7 @@ export function getModelsConfig(): ModelsConfig {
  * Gets finance-specific configuration with defaults
  * Finance-specific model settings override shared models config
  */
-export function getFinanceConfig(): FinanceConfig {
+export function getFinanceConfig(): FinanceConfig & { lightModel: string; strongModel: string } {
 	const projectConfig = getProjectConfig();
 	const modelsConfig = getModelsConfig();
 	const financeConfig = FinanceConfigSchema.parse(projectConfig.finance ?? {});
@@ -185,8 +186,8 @@ export function getFinanceConfig(): FinanceConfig {
 	// Use shared models config as fallback for finance-specific models
 	return {
 		...financeConfig,
-		lightModel: financeConfig.lightModel || modelsConfig.light,
-		strongModel: financeConfig.strongModel || modelsConfig.strong,
+		lightModel: financeConfig.lightModel ?? modelsConfig.light,
+		strongModel: financeConfig.strongModel ?? modelsConfig.strong,
 		reasoning: financeConfig.reasoning.enabled
 			? financeConfig.reasoning
 			: modelsConfig.reasoning,

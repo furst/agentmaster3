@@ -4,17 +4,12 @@ import { createAgent } from "../core/agent.js";
 import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getModelsConfig } from "../core/project-config.js";
-import {
-  listVaultNotesTool,
-  readVaultNoteTool,
-  writeVaultNoteTool,
-  searchVaultTool,
-} from "../tools/obsidian-vault.js";
-import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
+import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
 
-/**
- * Command options using Zod schema
- */
+// Sub-agents
+import { createVaultAgent } from "../agents/vault-agent.js";
+import { createWebResearchAgent } from "../agents/web-research-agent.js";
+
 export const options = z.object({
   prompt: z
     .string()
@@ -26,114 +21,82 @@ type Props = {
   options: z.infer<typeof options>;
 };
 
-const SYSTEM_PROMPT = `You are a helpful, friendly, and knowledgeable assistant.
+function buildSystemPrompt(): string {
+  return buildOrchestratorPrompt({
+    role: `You are a helpful, friendly, and knowledgeable assistant. You help with questions, explanations, writing, brainstorming, and problem-solving.`,
 
-Your responses should be:
-- Clear and concise
-- Well-structured when explaining complex topics
-- Honest about limitations or uncertainty
+    subAgents: [
+      {
+        name: "vault_agent",
+        description: "Manages Obsidian vault (notes, knowledge base)",
+        useCases: [
+          "Save this to my notes",
+          "Find my notes about...",
+          "What recipes do I have?",
+          "Search my knowledge base",
+        ],
+      },
+      {
+        name: "web_research_agent",
+        description: "Searches the web and fetches content",
+        useCases: [
+          "Search for...",
+          "What's happening with...",
+          "Find information about...",
+          "Current events",
+        ],
+      },
+    ],
 
-You can help with a wide variety of tasks including:
-- Answering questions on various topics
-- Explaining concepts and ideas
-- Helping with writing and editing
-- Brainstorming and ideation
-- General problem-solving
+    additionalInstructions: `## General Guidelines
+
+- Be clear and concise
+- When fetching content from the web, offer to save useful items to the vault
+- When performing vault operations, be brief - don't comment on note content
+- Be honest about limitations or uncertainty
 
 ## Content Formatting
 
-When presenting structured content that needs attention, use ContentCard markers for better display:
+Use ContentCard markers for structured content:
 
-\`\`\`
-:::type "Title"
-Content here...
-:::
-\`\`\`
-
-Available types:
-- \`recipe\` - For recipes and cooking instructions
-- \`summary\` - For summaries and overviews
-- \`list\` - For curated lists and collections
-- \`info\` - For informational content
-- \`warning\` - For warnings and cautions
-- \`success\` - For confirmations
-
-Inside cards, use:
-- \`## Headers\` for sections
-- \`- bullets\` for lists
-- \`**bold**\` for emphasis
-- \`Key: Value\` pairs are auto-highlighted
-
-Example:
-:::recipe "Chocolate Chip Cookies"
-Prep Time: 15 minutes
-Cook Time: 12 minutes
+:::recipe "Recipe Name"
+Prep Time: X minutes
 
 ## Ingredients
-- 2 cups flour
-- 1 cup butter
-- 1 cup chocolate chips
+- Item 1
+- Item 2
 
 ## Instructions
-1. Mix dry ingredients
-2. Cream butter and sugar
-3. Combine and fold in chips
-4. Bake at 375°F for 12 minutes
+1. Step one
+2. Step two
 :::
 
-Use these cards for recipes, guides, summaries, and any structured content the user should focus on.
+Available types: \`recipe\`, \`summary\`, \`list\`, \`info\`, \`warning\`, \`success\`
 
-## Notes & Storage
+## Vault Notes
 
-You have access to the user's Obsidian vault for storing and retrieving notes. Use these capabilities when:
+When saving to vault:
+- Save to "Bucket" folder (e.g., "Bucket/Recipe Name.md")
+- Use content title as filename
+- Format as clean markdown`,
+  });
+}
 
-- User says "save this", "store this", "remember this", "add to my notes" → write_vault_note
-- User asks for a recipe, guide, or reference material → offer to save it to their vault
-- User says "get my notes on...", "find my...", "what did I save about..." → search_vault to find by content, then read_vault_note
-- User wants to update or add to existing notes → read first, then write with append mode
-
-When saving content:
-- Always save to the "Bucket" folder (e.g., "Bucket/Chocolate Cake.md")
-- Use the content's title as the filename
-- Keep spaces in filenames - Obsidian handles them well and they look nicer
-- Format content as clean markdown
-- When saving from a URL, pass the sourceUrl parameter to include it in References
-
-When performing vault operations, be brief and factual. Don't comment on or evaluate the content of notes (no "nice recipe!", "interesting notes!", etc). Just confirm the action was completed.
-
-## Web Search & Content
-
-You can search the web and fetch content from URLs:
-
-- User asks about current events, recent info, or "search for..." → exa_search
-- User provides a URL → exa_get_contents
-
-When fetching recipes or useful content from the web, offer to save it to the vault.
-
-Always aim to be helpful while being accurate and thoughtful in your responses.`;
-
-/**
- * Ask command - general assistant with Obsidian vault tools
- * Uses the light model for fast, cost-effective responses
- */
 export default function Ask({ options }: Props) {
-  // Create agent instance (memoized to prevent recreation)
+  const modelsConfig = getModelsConfig();
+
+  // Create sub-agents
+  const vaultAgent = useMemo(() => createVaultAgent(), []);
+  const webResearchAgent = useMemo(() => createWebResearchAgent(), []);
+
   const agent = useMemo(() => {
-    const modelsConfig = getModelsConfig();
     return createAgent({
       name: "ask",
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: buildSystemPrompt(),
       model: modelsConfig.light,
-      tools: createToolsRecord([
-        listVaultNotesTool,
-        readVaultNoteTool,
-        writeVaultNoteTool,
-        searchVaultTool,
-        exaSearchTool,
-        exaGetContentsTool,
-      ]),
+      tools: createToolsRecord([vaultAgent, webResearchAgent]),
     });
-  }, []);
+  }, [modelsConfig.light, vaultAgent, webResearchAgent]);
 
   return (
     <AgentShell
@@ -142,7 +105,7 @@ export default function Ask({ options }: Props) {
       color="cyan"
       placeholder="Ask me anything..."
       initialPrompt={options.prompt}
-      welcomeMessage="Welcome! I'm a helpful assistant. Ask me anything, or type a message to get started."
+      welcomeMessage="Welcome! I'm a helpful assistant with access to your notes and web research. Ask me anything!"
     />
   );
 }

@@ -4,12 +4,14 @@ import { createAgent } from "../core/agent.js";
 import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getFinanceConfig } from "../core/project-config.js";
+import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
 
-// Tools
-import { listPdfsTool } from "../tools/list-pdfs.js";
-import { readPdfTool } from "../tools/read-pdf.js";
+// Sub-agents (delegated tasks)
+import { createPdfAgent } from "../agents/pdf-agent.js";
+import { createWebResearchAgent } from "../agents/web-research-agent.js";
+
+// Direct tools (finance-specific)
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
-import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
 import { createPlanTool, updatePlanStepTool, readPlanTool } from "../tools/agent-planning.js";
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from "../tools/research-notes.js";
@@ -22,136 +24,101 @@ type Props = {
   options: z.infer<typeof options>;
 };
 
-function buildSystemPrompt(): string {
-  const config = getFinanceConfig();
-
-  const newsletterSection = config.newsletterDirectory
-    ? `\n\n**Newsletter Directory**: ${config.newsletterDirectory}
-Use list_pdfs to see available newsletters, then read_pdf to analyze them.`
-    : "";
-
+function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string {
   const socialDomains = config.researchSources.social.join(", ");
   const newsDomains = config.researchSources.news.join(", ");
   const redditSubs = config.researchSources.redditSubs.join(", ");
 
-  return `You are a knowledgeable investment research assistant. Help the user find investment opportunities, analyze newsletters, research companies, and refine their investment strategy.
+  const newsletterDir = config.newsletterDirectory || "";
 
-## Your Capabilities
+  return buildOrchestratorPrompt({
+    role: `You are a knowledgeable investment research assistant. You help users find investment opportunities, analyze newsletters, research companies, and refine their investment strategy.`,
 
-1. **Portfolio Analysis**: Read the user's current holdings from parsed screenshots. Parse new holdings screenshots when uploaded.
-2. **Newsletter Analysis**: Read and summarize PDF investment newsletters from the user's collection.
-3. **Social Research**: Search Reddit (r/${redditSubs.replace(/, /g, ", r/")}), Twitter/X, and HackerNews for investment discussions.
-4. **Financial News**: Search ${newsDomains} for professional analysis and market news.
-5. **Company Research**: Research companies using web search, fetch investor relations pages, earnings reports, and news.
-6. **Investment Mindset**: Help the user develop and maintain their investment philosophy and decision-making framework.
+    subAgents: [
+      {
+        name: "pdf_agent",
+        description: `Analyzes PDF documents (newsletters, reports). Newsletter directory: ${newsletterDir}`,
+        useCases: [
+          "Summarize my latest newsletter",
+          "What does the report say about X?",
+          "List available PDFs",
+          `IMPORTANT: Always pass directory="${newsletterDir}" when working with newsletters`,
+        ],
+      },
+      {
+        name: "web_research_agent",
+        description: "Searches the web and fetches article content",
+        useCases: [
+          "Research company X",
+          "What's the sentiment on Reddit about NVDA?",
+          "Find recent news about earnings",
+          `Social sources: ${socialDomains}`,
+          `News sources: ${newsDomains}`,
+          `Reddit: r/${redditSubs.replace(/, /g, ", r/")}`,
+        ],
+      },
+    ],
 
-## Guidelines
+    directTools: [
+      { name: "read_holdings", description: "Read user's stock portfolio" },
+      { name: "parse_holdings_image", description: "Parse holdings from screenshot" },
+      { name: "read_mindset", description: "Read user's investment philosophy" },
+      { name: "save_mindset", description: "Update investment philosophy" },
+      { name: "create_plan", description: "Create multi-step research plan" },
+      { name: "update_plan_step", description: "Update plan progress" },
+      { name: "save_research_note", description: "Save research findings" },
+    ],
 
-- Always read the user's mindset file first when giving personalized advice (use read_mindset)
-- Be factual and cite sources when discussing specific investments
-- Present multiple perspectives (bull/bear cases) for investment ideas
-- Flag risks and uncertainties clearly
-- Never give definitive "buy" or "sell" recommendations - provide analysis for informed decisions
-- For social research, use exa_search with includeDomains parameter
-- For Reddit specifically: use exa_search with includeDomains=["reddit.com"] AND includeText=true (Reddit blocks direct fetching, so get content from Exa's index)
-- Include subreddit in your query (e.g., "r/investing NVDA")
+    additionalInstructions: `## Finance-Specific Guidelines
 
-## Complex Task Workflow
-
-For complex or multi-step research tasks (portfolio analysis, deep company research, market analysis):
-
-1. **Create a plan first**: Use \`create_plan\` to break down the task into steps
-2. **Work through steps systematically**: Update each step as you progress with \`update_plan_step\`
-3. **Save important findings**: Use \`save_research_note\` to store key information you'll need later
-4. **Track progress**: Use \`read_plan\` to review your progress if needed
-
-This ensures thorough analysis and prevents missing important steps. You can take your time and work methodically through complex requests.
-
-## Tools Available
-
-- **read_holdings**: Read the user's current stock holdings from saved data
-- **parse_holdings_image**: Parse a new holdings screenshot (uses AI vision). Call when user uploads a new screenshot.
-- **list_holdings_images**: List available holdings screenshots
-- **list_pdfs**: List available PDF newsletters in a directory
-- **read_pdf**: Read and extract/summarize text from PDF files (uses a light AI model for extraction)
-- **read_mindset**: Read the user's investment philosophy
-- **save_mindset**: Update the user's investment philosophy
-- **exa_search**: Search the web (filter by domain for specific sources)
-- **exa_get_contents**: Fetch full article/thread content from URLs
-
-### Planning & Research Storage
-- **create_plan**: Create a step-by-step research plan for complex tasks
-- **update_plan_step**: Mark steps complete, add findings, or abandon plan
-- **read_plan**: Check current plan status and progress
-- **save_research_note**: Save important findings for later reference
-- **read_research_notes**: Read back saved research notes
-- **list_research_notes**: List all saved research notes
-
-## Research Sources
-
-**Social/Forums**: ${socialDomains}
-**Financial News**: ${newsDomains}
-**Reddit Subreddits**: r/${redditSubs.replace(/, /g, ", r/")}
-${newsletterSection}
-
-## Output Style
-
-- Be concise but thorough
-- Use bullet points for clarity
-- Include source links when available
-- Structure longer analyses with headers
-- When presenting investment ideas, always include both opportunities and risks
-
-## Content Formatting
-
-Use ContentCard markers to highlight important findings and summaries:
+- **Read mindset first** when giving personalized advice
+- Present **bull and bear cases** for investments
+- **Flag risks clearly** - never give definitive buy/sell recommendations
+- Use **ContentCard** markers for structured output:
 
 :::finance "Company Analysis: TICKER"
-Current Price: $XXX
-Market Cap: $XXB
+Price: $XXX | Market Cap: $XXB
 
 ## Bull Case
-- Key opportunity 1
-- Key opportunity 2
+- Key opportunity
 
 ## Bear Case
-- Key risk 1
-- Key risk 2
-
-## Sources
-- [Source 1](url)
+- Key risk
 :::
 
-Available card types:
-- \`finance\` - For investment analysis, portfolio summaries, company research
-- \`summary\` - For newsletter summaries and overviews
-- \`warning\` - For risk warnings and cautions
-- \`news\` - For market news roundups
+## PDF/Newsletter Analysis
 
-Inside cards use \`Key: Value\` for metrics (auto-highlighted), \`## Headers\` for sections, and \`**bold**\` for emphasis.`;
+When working with newsletters or PDFs:
+- Newsletter directory: ${newsletterDir}
+- ALWAYS pass \`directory: "${newsletterDir}"\` to pdf_agent for newsletter operations
+- When summarizing specific files, pass \`filePath\` with the full path`,
+  });
 }
 
 export default function Finance({ options }: Props) {
   const config = getFinanceConfig();
 
+  // Create sub-agents
+  const pdfAgent = useMemo(() => createPdfAgent(), []);
+  const webResearchAgent = useMemo(() => createWebResearchAgent(), []);
+
+  // Create orchestrator agent with sub-agents + direct tools
   const agent = useMemo(
     () =>
       createAgent({
         name: "finance",
-        systemPrompt: buildSystemPrompt(),
+        systemPrompt: buildSystemPrompt(config),
         model: config.strongModel,
         tools: createToolsRecord([
-          // Research & data tools
-          listPdfsTool,
-          readPdfTool,
+          // Sub-agents (delegated tasks)
+          pdfAgent,
+          webResearchAgent,
+          // Direct tools (finance-specific)
           readMindsetTool,
           saveMindsetTool,
-          exaSearchTool,
-          exaGetContentsTool,
           parseHoldingsImageTool,
           readHoldingsTool,
           listHoldingsImagesTool,
-          // Planning & notes tools
           createPlanTool,
           updatePlanStepTool,
           readPlanTool,
@@ -164,7 +131,7 @@ export default function Finance({ options }: Props) {
           ? { enabled: true, budgetTokens: config.reasoning.budgetTokens }
           : undefined,
       }),
-    [config.strongModel, config.reasoning.enabled, config.reasoning.budgetTokens]
+    [config.strongModel, config.reasoning.enabled, config.reasoning.budgetTokens, pdfAgent, webResearchAgent]
   );
 
   return (
@@ -174,7 +141,7 @@ export default function Finance({ options }: Props) {
       color="green"
       placeholder="Ask about investments, newsletters, or research a company..."
       initialPrompt={options.prompt}
-      welcomeMessage="I'm your investment research assistant. I can analyze newsletters, search Reddit/Twitter/HackerNews for advice, check financial news, research companies, and help refine your investment mindset. What would you like to explore?"
+      welcomeMessage="I'm your investment research orchestrator. I coordinate specialized agents for PDF analysis and web research, plus I have direct access to your portfolio and mindset. What would you like to explore?"
     />
   );
 }

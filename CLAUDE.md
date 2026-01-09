@@ -22,12 +22,20 @@ source/
 │   ├── project-config.ts # Project config (./config.json)
 │   ├── llm.ts          # Anthropic client wrapper
 │   ├── tools.ts        # Tool definition helpers
-│   └── agent.ts        # Agent factory + useAgent hook
+│   ├── agent.ts        # Agent factory + useAgent hook
+│   ├── events.ts       # Event bus for sub-agent communication
+│   └── sub-agent.ts    # Sub-agent factory (hierarchical agents)
+├── agents/             # Reusable sub-agent definitions
+│   ├── index.ts        # Exports all sub-agents
+│   ├── pdf-agent.ts    # PDF document analysis
+│   ├── web-research-agent.ts # Web search and content fetching
+│   └── vault-agent.ts  # Obsidian vault operations
 ├── components/
 │   ├── AgentShell.tsx  # Main agent UI wrapper
 │   ├── Message.tsx     # Message rendering (supports ContentCard markers)
 │   ├── ContentCard.tsx # Highlighted content boxes for important data
 │   ├── ToolCall.tsx    # Tool call visualization (Claude Code-inspired)
+│   ├── SubAgentStatus.tsx # Sub-agent progress visualization
 │   ├── ModelIndicator.tsx # Displays current model and reasoning status in header
 │   ├── Timeline.tsx    # Status timeline
 │   ├── Spinner.tsx     # Loading indicators
@@ -349,8 +357,8 @@ Project-level configuration stored in the project root. Used for shared model se
 ```json
 {
   "models": {
-    "light": "google:gemini-2.5-flash-preview-05-20",
-    "strong": "google:gemini-2.5-pro-preview-05-20",
+    "light": "google:gemini-3-flash-preview",
+    "strong": "google:gemini-3-pro-preview",
     "reasoning": {
       "enabled": false,
       "budgetTokens": 10000
@@ -377,8 +385,8 @@ This is loaded via `getProjectConfig()`, `getModelsConfig()`, `getNewsConfig()`,
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `light` | `google:gemini-2.5-flash-preview-05-20` | Light model for fast tasks (ask, news, PDF summarization) |
-| `strong` | `google:gemini-2.5-pro-preview-05-20` | Strong model for complex reasoning tasks (finance) |
+| `light` | `google:gemini-3-flash-preview` | Light model for fast tasks (ask, news, PDF summarization) |
+| `strong` | `google:gemini-3-pro-preview` | Strong model for complex reasoning tasks (finance) |
 | `reasoning.enabled` | false | Enable extended thinking for supported models |
 | `reasoning.budgetTokens` | 10000 | Token budget for extended thinking |
 
@@ -443,6 +451,190 @@ const tool = defineTool({
   parameters: z.object({ ... }),
   execute: async (params, context) => { ... },
 });
+```
+
+## Hierarchical Agents (Orchestrator-Workers)
+
+The architecture supports hierarchical agent patterns where a Main Agent (orchestrator) can delegate tasks to specialized Sub-Agents (workers). This enables:
+- Strong models orchestrating lighter/cheaper models for parallel work
+- Real-time visibility into sub-agent progress via the event bus
+- Clean separation of concerns between orchestration and task execution
+
+### Event Bus (`source/core/events.ts`)
+
+Singleton event emitter for sub-agent communication:
+
+```typescript
+import { agentEvents, generateProcessId } from '../core/events.js';
+
+// Generate unique process ID
+const processId = generateProcessId(); // "subagent_1234567890_1"
+
+// Emit events
+agentEvents.emit({
+  type: 'subAgentStart',
+  processId,
+  agentName: 'research_agent',
+  parentToolCallId: 'tc_123',
+  task: 'Research AAPL earnings',
+  model: 'google:gemini-2.5-flash',
+  timestamp: Date.now(),
+});
+
+// Subscribe to events
+agentEvents.on('subAgentToolCall', (event) => {
+  console.log(`${event.toolName}: ${event.status}`);
+});
+
+// Available events:
+// - subAgentStart: Sub-agent begins execution
+// - subAgentToolCall: Sub-agent calls a tool (running/complete/error)
+// - subAgentLog: Debug/info messages
+// - subAgentFinish: Sub-agent completes (success/error)
+```
+
+### createSubAgentTool(config)
+
+Factory function that creates a tool wrapping a sub-agent. When the main agent calls this tool, it spawns a complete agentic loop with its own tools:
+
+```typescript
+import { createSubAgentTool } from '../core/sub-agent.js';
+import { exaSearchTool, exaGetContentsTool } from '../tools/exa-search.js';
+
+const webResearchAgent = createSubAgentTool({
+  name: 'web_research_agent',
+  description: 'Specialized agent for web research. Use when you need to search and analyze web content.',
+  systemPrompt: `You are a web research specialist. Your job is to:
+1. Search for relevant information using exa_search
+2. Fetch full content from promising URLs
+3. Synthesize findings into a clear summary`,
+  model: 'google:gemini-2.5-flash',  // Light model for cost efficiency
+  tools: [exaSearchTool, exaGetContentsTool],
+  maxSteps: 8,
+});
+
+// Use in main agent
+const orchestrator = createAgent({
+  name: 'orchestrator',
+  systemPrompt: 'You coordinate specialized agents...',
+  model: 'google:gemini-2.5-pro',  // Strong model for orchestration
+  tools: createToolsRecord([webResearchAgent, documentAnalysisAgent]),
+});
+```
+
+**Config options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | string | required | Tool name (snake_case) |
+| `description` | string | required | Description for the LLM |
+| `systemPrompt` | string | required | Sub-agent's system prompt |
+| `model` | string | required | Model spec (e.g., "google:gemini-2.5-flash") |
+| `tools` | array/record | required | Tools available to sub-agent |
+| `maxSteps` | number | 10 | Maximum agentic steps |
+| `inputSchema` | ZodObject | `{task, context?}` | Custom input schema |
+| `taskTransformer` | function | - | Transform input to task string |
+| `resultTransformer` | function | - | Transform result before returning |
+
+**Return value:**
+
+```typescript
+{
+  success: boolean;
+  agentName: string;
+  processId: string;
+  response: string;        // Final text from sub-agent
+  toolCallCount: number;
+  toolCalls: ToolCallSummary[];
+  duration: number;
+  error?: string;
+}
+```
+
+### SubAgentStatus Component
+
+React/Ink component that visualizes sub-agent progress in real-time:
+
+```tsx
+import { SubAgentStatus } from '../components/SubAgentStatus.js';
+
+// In your component
+<SubAgentStatus
+  showCompletedTools={true}  // Show completed tool calls
+  maxToolCalls={5}           // Limit visible tool calls
+  compact={false}            // Full or compact mode
+/>
+```
+
+**Visual output:**
+
+```
+⚙ Sub-Agents
+└─ 🤖 Web Research Agent (Active)
+   ├─ ⠋ exa_search "AAPL earnings Q4"
+   ├─ ✓ exa_get_contents (2.3s) → 3 pages
+   └─ ⠋ read_pdf "report.pdf"...
+
+└─ 🤖 Analysis Agent (Complete - 5.2s)
+   ├─ ✓ read_holdings (0.4s) → 12 holdings
+   └─ ✓ read_mindset (0.2s) → 45 lines
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `processId` | string | - | Filter to specific sub-agent |
+| `agentName` | string | - | Filter by agent name |
+| `showCompletedTools` | boolean | true | Show completed tool calls |
+| `maxToolCalls` | number | 10 | Max tool calls per sub-agent |
+| `compact` | boolean | false | Single-line per agent |
+
+### Example: Research Orchestrator
+
+```tsx
+// source/commands/research.tsx
+import { createAgent } from "../core/agent.js";
+import { createSubAgentTool } from "../core/sub-agent.js";
+import { AgentShell } from "../components/AgentShell.js";
+
+export default function Research({ options }) {
+  // Create specialized sub-agents
+  const webResearchAgent = useMemo(() => createSubAgentTool({
+    name: 'web_research_agent',
+    description: 'For web searches and news',
+    systemPrompt: 'You are a web research specialist...',
+    model: 'google:gemini-2.5-flash',
+    tools: [exaSearchTool, exaGetContentsTool],
+  }), []);
+
+  const documentAgent = useMemo(() => createSubAgentTool({
+    name: 'document_analysis_agent',
+    description: 'For analyzing PDFs and reports',
+    systemPrompt: 'You analyze documents...',
+    model: 'google:gemini-2.5-flash',
+    tools: [listPdfsTool, readPdfTool],
+  }), []);
+
+  // Create orchestrator with sub-agents as tools
+  const orchestrator = useMemo(() => createAgent({
+    name: 'research-orchestrator',
+    systemPrompt: `You coordinate research tasks:
+- Use web_research_agent for online searches
+- Use document_analysis_agent for PDF analysis
+- Synthesize results into comprehensive answers`,
+    model: 'google:gemini-2.5-pro',
+    tools: createToolsRecord([webResearchAgent, documentAgent]),
+  }), [webResearchAgent, documentAgent]);
+
+  return (
+    <AgentShell
+      agent={orchestrator}
+      name="Research Orchestrator"
+      color="magenta"
+    />
+  );
+}
 ```
 
 ## ContentCard - Highlighted Content Display

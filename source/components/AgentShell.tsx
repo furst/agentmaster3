@@ -3,6 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { MessageList } from './Message.js';
 import { ToolCallList } from './ToolCall.js';
+import { SubAgentStatus } from './SubAgentStatus.js';
 import { InlineTimeline } from './Timeline.js';
 import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
 import { ModelIndicator } from './ModelIndicator.js';
@@ -147,6 +148,9 @@ export function AgentShell({
 					<ToolCallList toolCalls={currentToolCalls} showCompleted={true} />
 				</Box>
 			)}
+
+			{/* Sub-agent status section */}
+			{isLoading && <SubAgentStatus showCompletedTools={true} maxToolCalls={5} />}
 
 			{/* Error display */}
 			{error && (
