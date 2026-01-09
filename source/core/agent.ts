@@ -207,6 +207,8 @@ export function createAgent(config: AgentConfig) {
 
 	return {
 		name,
+		model,
+		reasoning: reasoning?.enabled ?? false,
 		sendMessage,
 		cancel,
 		reset,

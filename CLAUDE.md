@@ -28,6 +28,7 @@ source/
 │   ├── Message.tsx     # Message rendering (supports ContentCard markers)
 │   ├── ContentCard.tsx # Highlighted content boxes for important data
 │   ├── ToolCall.tsx    # Tool call visualization (Claude Code-inspired)
+│   ├── ModelIndicator.tsx # Displays current model and reasoning status in header
 │   ├── Timeline.tsx    # Status timeline
 │   ├── Spinner.tsx     # Loading indicators
 │   └── Error.tsx       # Error displays
@@ -47,7 +48,8 @@ source/
 └── utils/
     ├── format.ts       # Text formatting helpers
     ├── streaming.ts    # Stream processing utilities
-    └── content-parser.ts # Parses ContentCard markers in messages
+    ├── content-parser.ts # Parses ContentCard markers in messages
+    └── model.ts        # Model name parsing and shortening utilities
 ```
 
 ## Adding a New Agent
@@ -342,10 +344,18 @@ Set your Anthropic API key using one of these methods (in priority order):
 
 ### Project Config (`./config.json`)
 
-Project-level configuration stored in the project root. Used for agent-specific settings like news sources.
+Project-level configuration stored in the project root. Used for shared model settings and agent-specific configuration.
 
 ```json
 {
+  "models": {
+    "light": "google:gemini-2.5-flash-preview-05-20",
+    "strong": "google:gemini-2.5-pro-preview-05-20",
+    "reasoning": {
+      "enabled": false,
+      "budgetTokens": 10000
+    }
+  },
   "news": {
     "sites": ["aftonbladet.se", "omni.se"],
     "interests": ["technology", "sports"],
@@ -361,7 +371,23 @@ Project-level configuration stored in the project root. Used for agent-specific 
 }
 ```
 
-This is loaded via `getProjectConfig()`, `getNewsConfig()`, and `getObsidianConfig()` from `core/project-config.ts`.
+This is loaded via `getProjectConfig()`, `getModelsConfig()`, `getNewsConfig()`, and `getObsidianConfig()` from `core/project-config.ts`.
+
+#### Models Config Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `light` | `google:gemini-2.5-flash-preview-05-20` | Light model for fast tasks (ask, news, PDF summarization) |
+| `strong` | `google:gemini-2.5-pro-preview-05-20` | Strong model for complex reasoning tasks (finance) |
+| `reasoning.enabled` | false | Enable extended thinking for supported models |
+| `reasoning.budgetTokens` | 10000 | Token budget for extended thinking |
+
+**Agent model assignment:**
+- `ask` - uses `models.light`
+- `news` - uses `models.light`
+- `finance` - uses `models.strong` (or `finance.strongModel` if overridden)
+
+**Note:** The agent header displays the current model (e.g., `gemini-2.5-pro` or `gemini-2.5-flash`) and shows `+thinking` when reasoning is enabled. Tools may use `light` model internally - this is visible in tool output (`modelUsed` field).
 
 #### Obsidian Config Options
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAgent } from "../core/agent.js";
 import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
+import { getModelsConfig } from "../core/project-config.js";
 import {
   listVaultNotesTool,
   readVaultNoteTool,
@@ -113,25 +114,26 @@ Always aim to be helpful while being accurate and thoughtful in your responses.`
 
 /**
  * Ask command - general assistant with Obsidian vault tools
+ * Uses the light model for fast, cost-effective responses
  */
 export default function Ask({ options }: Props) {
   // Create agent instance (memoized to prevent recreation)
-  const agent = useMemo(
-    () =>
-      createAgent({
-        name: "ask",
-        systemPrompt: SYSTEM_PROMPT,
-        tools: createToolsRecord([
-          listVaultNotesTool,
-          readVaultNoteTool,
-          writeVaultNoteTool,
-          searchVaultTool,
-          exaSearchTool,
-          exaGetContentsTool,
-        ]),
-      }),
-    []
-  );
+  const agent = useMemo(() => {
+    const modelsConfig = getModelsConfig();
+    return createAgent({
+      name: "ask",
+      systemPrompt: SYSTEM_PROMPT,
+      model: modelsConfig.light,
+      tools: createToolsRecord([
+        listVaultNotesTool,
+        readVaultNoteTool,
+        writeVaultNoteTool,
+        searchVaultTool,
+        exaSearchTool,
+        exaGetContentsTool,
+      ]),
+    });
+  }, []);
 
   return (
     <AgentShell

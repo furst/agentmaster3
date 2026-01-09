@@ -5,6 +5,7 @@ import { MessageList } from './Message.js';
 import { ToolCallList } from './ToolCall.js';
 import { InlineTimeline } from './Timeline.js';
 import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
+import { ModelIndicator } from './ModelIndicator.js';
 import { useAgent, type Agent } from '../core/agent.js';
 
 export interface AgentShellProps {
@@ -116,6 +117,8 @@ export function AgentShell({
 					<Text color={color} bold>
 						{name}
 					</Text>
+					<Text color="gray"> | </Text>
+					<ModelIndicator model={agent.model} reasoning={agent.reasoning} />
 					<Text color="gray"> | </Text>
 					<Text color="gray" dimColor>
 						Ctrl+C to {isLoading ? 'cancel' : 'exit'}, Ctrl+R to reset

@@ -3,6 +3,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
+ * Shared models configuration schema
+ * Available to all agents for consistent model usage
+ */
+const ModelsConfigSchema = z.object({
+	// Default light model for fast, cheap tasks (PDF summarization, image parsing, etc.)
+	light: z.string().default('google:gemini-2.5-flash-preview-05-20'),
+	// Default strong model for complex reasoning tasks
+	strong: z.string().default('google:gemini-2.5-pro-preview-05-20'),
+	// Reasoning/thinking configuration
+	reasoning: z
+		.object({
+			enabled: z.boolean().default(false),
+			budgetTokens: z.number().default(10000),
+		})
+		.default({}),
+});
+
+/**
  * News agent configuration schema
  */
 const NewsConfigSchema = z.object({
@@ -81,12 +99,15 @@ const FinanceConfigSchema = z.object({
  * This is separate from user-level config (~/.config/agentmaster/)
  */
 const ProjectConfigSchema = z.object({
+	// Shared model configuration for all agents
+	models: ModelsConfigSchema.optional(),
 	news: NewsConfigSchema.optional(),
 	finance: FinanceConfigSchema.optional(),
 	obsidian: ObsidianConfigSchema.optional(),
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
+export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 export type NewsConfig = z.infer<typeof NewsConfigSchema>;
 export type FinanceConfig = z.infer<typeof FinanceConfigSchema>;
 export type ObsidianConfig = z.infer<typeof ObsidianConfigSchema>;
@@ -144,11 +165,32 @@ export function getNewsConfig(): NewsConfig {
 }
 
 /**
+ * Gets shared models configuration with defaults
+ * Use this for consistent model access across all agents
+ */
+export function getModelsConfig(): ModelsConfig {
+	const projectConfig = getProjectConfig();
+	return ModelsConfigSchema.parse(projectConfig.models ?? {});
+}
+
+/**
  * Gets finance-specific configuration with defaults
+ * Finance-specific model settings override shared models config
  */
 export function getFinanceConfig(): FinanceConfig {
 	const projectConfig = getProjectConfig();
-	return FinanceConfigSchema.parse(projectConfig.finance ?? {});
+	const modelsConfig = getModelsConfig();
+	const financeConfig = FinanceConfigSchema.parse(projectConfig.finance ?? {});
+
+	// Use shared models config as fallback for finance-specific models
+	return {
+		...financeConfig,
+		lightModel: financeConfig.lightModel || modelsConfig.light,
+		strongModel: financeConfig.strongModel || modelsConfig.strong,
+		reasoning: financeConfig.reasoning.enabled
+			? financeConfig.reasoning
+			: modelsConfig.reasoning,
+	};
 }
 
 /**

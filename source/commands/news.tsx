@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createAgent } from "../core/agent.js";
 import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
-import { getNewsConfig } from "../core/project-config.js";
+import { getNewsConfig, getModelsConfig } from "../core/project-config.js";
 import { exaSearchTool, exaGetContentsTool } from "../tools/exa-search.js";
 
 export const options = z.object({
@@ -61,16 +61,16 @@ Inside the card, use **bold** for headlines and keep summaries to one line each.
 }
 
 export default function News({ options }: Props) {
-  const agent = useMemo(
-    () =>
-      createAgent({
-        name: "news",
-        systemPrompt: buildSystemPrompt(),
-        tools: createToolsRecord([exaSearchTool, exaGetContentsTool]),
-        maxIterations: 15,
-      }),
-    []
-  );
+  const agent = useMemo(() => {
+    const modelsConfig = getModelsConfig();
+    return createAgent({
+      name: "news",
+      systemPrompt: buildSystemPrompt(),
+      model: modelsConfig.light,
+      tools: createToolsRecord([exaSearchTool, exaGetContentsTool]),
+      maxIterations: 15,
+    });
+  }, []);
 
   return (
     <AgentShell
