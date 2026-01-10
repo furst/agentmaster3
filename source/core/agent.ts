@@ -308,7 +308,9 @@ export function useAgent(agent: Agent) {
 						break;
 
 					case 'finish':
-						// Add completed assistant message
+						// Clear streaming FIRST, then add completed message
+						// This prevents brief duplication during state transition
+						setStreamingContent('');
 						if (assistantContent) {
 							const assistantMessage: Message = {
 								id: generateMessageId(),
@@ -318,7 +320,6 @@ export function useAgent(agent: Agent) {
 							};
 							setMessages((prev) => [...prev, assistantMessage]);
 						}
-						setStreamingContent('');
 						break;
 
 					case 'error':

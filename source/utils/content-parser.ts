@@ -58,7 +58,8 @@ export function parseContentWithCards(content: string): ContentSegment[] {
 
 	// Regex to match card blocks: :::type "optional title"\ncontent\n:::
 	// The type must be a valid card type, title is optional
-	const cardBlockRegex = /^:::(\w+)(?:\s+"([^"]*)")?\s*\n([\s\S]*?)^:::\s*$/gm;
+	// Allow optional whitespace between ::: and type (LLMs sometimes add a space)
+	const cardBlockRegex = /^:::\s*(\w+)(?:\s+"([^"]*)")?\s*\n([\s\S]*?)^:::\s*$/gm;
 
 	let lastIndex = 0;
 	let match;
@@ -128,10 +129,11 @@ export function parseContentWithCards(content: string): ContentSegment[] {
 /**
  * Checks if content contains any card markers
  * Looks for ::: followed by a valid card type anywhere in the content
+ * Allows optional whitespace between ::: and type
  */
 export function hasCardMarkers(content: string): boolean {
 	const cardTypePattern = validCardTypes.join('|');
-	const regex = new RegExp(`:::(?:${cardTypePattern})`, 'i');
+	const regex = new RegExp(`:::\\s*(?:${cardTypePattern})`, 'i');
 	return regex.test(content);
 }
 

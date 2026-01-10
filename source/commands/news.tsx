@@ -23,8 +23,12 @@ type Props = {
 function buildSystemPrompt(): string {
   const config = getNewsConfig();
 
-  const sitesNote = config.sites.length > 0
-    ? `Configured sources: ${config.sites.join(", ")}`
+  const configuredUrls = config.sites.map(site =>
+    site.startsWith('http') ? site : `https://${site}`
+  );
+
+  const sitesNote = configuredUrls.length > 0
+    ? `Configured news sources:\n${configuredUrls.map(url => `- ${url}`).join('\n')}`
     : "";
 
   const interestsNote = config.interests.length > 0
@@ -37,23 +41,37 @@ function buildSystemPrompt(): string {
     subAgents: [
       {
         name: "web_research_agent",
-        description: "Searches the web and fetches news content",
+        description: "Fetches news from URLs and searches the web",
         useCases: [
-          "Find latest headlines",
-          "Search news on specific topics",
-          "Get articles from configured sources",
+          "Fetch headlines from specific news sites",
+          "Search for news on specific topics",
+          "Get content from URLs",
         ],
       },
     ],
 
-    additionalInstructions: `## News-Specific Guidelines
+    additionalInstructions: `## News Sources
+
+${sitesNote}
+
+${interestsNote}
+
+## How to Fetch News
+
+**For general news requests** (e.g., "get me the news", "what's happening"):
+- Call web_research_agent with \`urls\` parameter containing the configured sources
+- Example: \`urls: ["https://omni.se", "https://aftonbladet.se"]\`
+- The agent will use exa_get_contents to fetch homepage content directly
+
+**For topic-specific requests** (e.g., "news about AI"):
+- Use web_research_agent with the topic as \`query\`
+- Optionally filter by \`domains\` if searching specific sites
+
+## Guidelines
 
 - **No commentary** like "I'll fetch..." or "The most interesting story is..."
 - Just present the news items directly
-- When user asks for news on multiple topics, use **parallel calls** (one per topic)
-
-${sitesNote}
-${interestsNote}
+- When fetching multiple sources, use **parallel calls** (one per source)
 
 ## Output Format
 

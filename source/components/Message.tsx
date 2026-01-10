@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text, Static } from 'ink';
+import { Box, Text } from 'ink';
 import { ContentCard } from './ContentCard.js';
 import { parseContentWithCards, hasCardMarkers } from '../utils/content-parser.js';
 
@@ -87,23 +87,15 @@ export interface MessageListProps {
 
 /**
  * Renders a list of conversation messages
- * Uses Static for completed messages to prevent duplication in terminal buffer
+ * Re-renders the entire list on each update to avoid terminal buffer duplication
  */
 export function MessageList({ messages, streamingContent }: MessageListProps) {
-	// Don't show streaming content if it's already been added to messages
-	// This prevents duplication during the state transition
-	const lastMessage = messages[messages.length - 1];
-	const showStreaming = streamingContent &&
-		!(lastMessage?.role === 'assistant' && lastMessage.content === streamingContent);
-
 	return (
 		<Box flexDirection="column">
-			<Static items={messages}>
-				{(message) => (
-					<Message key={message.id} role={message.role} content={message.content} />
-				)}
-			</Static>
-			{showStreaming && (
+			{messages.map((message) => (
+				<Message key={message.id} role={message.role} content={message.content} />
+			))}
+			{streamingContent && (
 				<Message role="assistant" content={streamingContent} isStreaming />
 			)}
 		</Box>
