@@ -46,6 +46,7 @@ export function AgentShell({
 		streamingContent,
 		currentToolCalls,
 		error,
+		stats,
 		sendMessage,
 		cancel,
 		reset,
@@ -171,6 +172,14 @@ export function AgentShell({
 					toolName={runningTool?.name}
 					completedSteps={currentToolCalls.filter((tc) => tc.status === 'complete').length}
 				/>
+				{/* Cost display when idle and has stats */}
+				{!isLoading && stats && stats.totalTokens > 0 && (
+					<Box marginLeft={2}>
+						<Text color="gray" dimColor>
+							| {stats.totalTokens.toLocaleString()} tokens | ${stats.costUSD.toFixed(4)}
+						</Text>
+					</Box>
+				)}
 			</Box>
 
 			{/* Input field */}

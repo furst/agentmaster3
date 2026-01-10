@@ -1,7 +1,8 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText, generateText, type ModelMessage, type Tool, stepCountIs } from 'ai';
+import { streamText, generateText, streamObject, generateObject, type ModelMessage, type Tool, stepCountIs } from 'ai';
 import { getConfig, getApiKey } from './config.js';
+import { z } from 'zod';
 
 // Re-export types with aliases for consistency
 export type CoreMessage = ModelMessage;
@@ -9,6 +10,51 @@ export type CoreTool = Tool;
 
 // Re-export the stream result type for consumers
 export type { StreamTextResult, GenerateTextResult } from 'ai';
+
+// ============================================================================
+// Cost Tracking
+// ============================================================================
+
+/** Token pricing per 1M tokens (input/output) */
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+	// Anthropic models
+	'claude-opus-4-5-20250514': { input: 15.0, output: 75.0 },
+	'claude-sonnet-4-5-20250514': { input: 3.0, output: 15.0 },
+	'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+	'claude-haiku-3-5-20241022': { input: 0.8, output: 4.0 },
+	// Google models
+	'gemini-2.5-pro-preview': { input: 1.25, output: 10.0 },
+	'gemini-2.5-flash-preview': { input: 0.15, output: 0.60 },
+	'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+	'gemini-3-pro-preview': { input: 1.25, output: 10.0 },
+	'gemini-3-flash-preview': { input: 0.15, output: 0.60 },
+};
+
+export interface TokenUsage {
+	promptTokens: number;
+	completionTokens: number;
+	totalTokens: number;
+}
+
+export interface CostTracking {
+	model: string;
+	usage: TokenUsage;
+	costUSD: number;
+}
+
+/**
+ * Calculates cost in USD for token usage
+ */
+export function calculateCost(model: string, usage: TokenUsage): number {
+	// Extract model ID from provider:model format
+	const modelId = model.includes(':') ? model.split(':')[1]! : model;
+	const pricing = MODEL_PRICING[modelId] ?? { input: 1.0, output: 3.0 }; // Default fallback
+
+	const inputCost = (usage.promptTokens / 1_000_000) * pricing.input;
+	const outputCost = (usage.completionTokens / 1_000_000) * pricing.output;
+
+	return inputCost + outputCost;
+}
 
 /**
  * Creates an Anthropic provider instance configured with the API key
@@ -188,4 +234,110 @@ export async function generateResponse(
 	});
 
 	return result;
+}
+
+// ============================================================================
+// Structured Output Generation
+// ============================================================================
+
+export interface StructuredOutputOptions<T extends z.ZodType> {
+	model?: string;
+	system?: string;
+	messages: CoreMessage[];
+	schema: T;
+	schemaName?: string;
+	schemaDescription?: string;
+	abortSignal?: AbortSignal;
+}
+
+/**
+ * Generates a structured object response using the specified Zod schema
+ * Uses the AI SDK's generateObject for reliable JSON output
+ */
+export async function generateStructuredOutput<T extends z.ZodType>(
+	options: StructuredOutputOptions<T>
+): Promise<{ object: z.infer<T>; usage: TokenUsage; costUSD: number }> {
+	const { model, system, messages, schema, schemaName, schemaDescription, abortSignal } = options;
+
+	const modelString = model ?? getConfig().defaultModel;
+	const llm = createModel(modelString);
+
+	const result = await generateObject({
+		model: llm,
+		system,
+		messages,
+		schema,
+		schemaName,
+		schemaDescription,
+		abortSignal,
+	});
+
+	const usage: TokenUsage = {
+		promptTokens: result.usage?.inputTokens ?? 0,
+		completionTokens: result.usage?.outputTokens ?? 0,
+		totalTokens: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0),
+	};
+
+	return {
+		object: result.object,
+		usage,
+		costUSD: calculateCost(modelString, usage),
+	};
+}
+
+export interface StreamStructuredOutputOptions<T extends z.ZodType> {
+	model?: string;
+	system?: string;
+	messages: CoreMessage[];
+	schema: T;
+	schemaName?: string;
+	schemaDescription?: string;
+	abortSignal?: AbortSignal;
+	onPartialObject?: (partial: unknown) => void;
+}
+
+/**
+ * Streams a structured object response using the specified Zod schema
+ * Useful for large responses where you want to show partial results
+ */
+export async function streamStructuredOutput<T extends z.ZodType>(
+	options: StreamStructuredOutputOptions<T>
+): Promise<{ object: z.infer<T>; usage: TokenUsage; costUSD: number }> {
+	const { model, system, messages, schema, schemaName, schemaDescription, abortSignal, onPartialObject } = options;
+
+	const modelString = model ?? getConfig().defaultModel;
+	const llm = createModel(modelString);
+
+	const result = streamObject({
+		model: llm,
+		system,
+		messages,
+		schema,
+		schemaName,
+		schemaDescription,
+		abortSignal,
+	});
+
+	// Process the stream
+	for await (const partialObject of result.partialObjectStream) {
+		if (onPartialObject) {
+			onPartialObject(partialObject);
+		}
+	}
+
+	// Get final result
+	const finalObject = await result.object;
+	const usage = await result.usage;
+
+	const tokenUsage: TokenUsage = {
+		promptTokens: usage?.inputTokens ?? 0,
+		completionTokens: usage?.outputTokens ?? 0,
+		totalTokens: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
+	};
+
+	return {
+		object: finalObject,
+		usage: tokenUsage,
+		costUSD: calculateCost(modelString, tokenUsage),
+	};
 }

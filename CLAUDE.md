@@ -411,7 +411,7 @@ This is loaded via `getProjectConfig()`, `getModelsConfig()`, `getNewsConfig()`,
 
 ### createAgent(config)
 
-Creates a reusable agent instance:
+Creates a reusable agent instance with conversation history, tool support, inline sub-agents, hooks, session management, and cost tracking:
 
 ```typescript
 const agent = createAgent({
@@ -420,8 +420,64 @@ const agent = createAgent({
   tools: { tool_name: toolDefinition },
   maxIterations: 10,
   model: "claude-sonnet-4-20250514",
+
+  // NEW: Inline sub-agent definitions (Claude SDK-style)
+  agents: {
+    "code-reviewer": {
+      description: "Expert code review specialist",
+      prompt: "You are a code review expert...",
+      tools: ["read_file", "grep"],  // Tool names from parent
+      model: "sonnet",  // Aliases: 'opus', 'sonnet', 'haiku'
+    },
+  },
+
+  // NEW: Hook callbacks
+  hooks: {
+    onBeforeToolCall: async (toolName, input, context) => {
+      console.log(`[AUDIT] ${toolName}`);
+      return { action: 'allow' };
+    },
+    onAfterToolCall: async (toolName, input, result, context) => {
+      return {}; // Can return { modifiedResult } to transform
+    },
+    onStart: async (message) => { /* called when processing starts */ },
+    onFinish: async (response, stats) => { /* called when done */ },
+  },
+
+  // NEW: Structured output schema
+  outputSchema: z.object({
+    summary: z.string(),
+    issues: z.array(z.object({
+      severity: z.enum(['low', 'medium', 'high']),
+      description: z.string(),
+    })),
+  }),
 });
+
+// Agent methods
+agent.sendMessage(prompt, onEvent);           // Stream response with tools
+agent.sendMessageStructured(prompt, schema?); // Get typed JSON response
+agent.getStats();                             // Get cost & token tracking
+agent.exportSession();                        // Save session for later
+agent.importSession(session);                 // Resume previous session
+agent.getSessionId();                         // Get current session ID
+agent.reset();                                // Clear history and stats
+agent.cancel();                               // Cancel current request
 ```
+
+**Config options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | string | Agent identifier |
+| `systemPrompt` | string | System instructions |
+| `tools` | Record<string, CoreTool> | Available tools |
+| `maxIterations` | number | Max tool call loops (default: 10) |
+| `model` | string | Model to use |
+| `reasoning` | ReasoningConfig | Extended thinking config |
+| `agents` | Record<string, AgentDefinition> | Inline sub-agent definitions |
+| `hooks` | AgentHooks | Lifecycle callbacks |
+| `outputSchema` | ZodType | Schema for structured output |
 
 ### useAgent(agent)
 
@@ -429,14 +485,15 @@ React hook for using an agent in components:
 
 ```typescript
 const {
-  messages, // Conversation history
-  isLoading, // Currently processing
-  streamingContent, // Partial response being streamed
-  currentToolCalls, // Active tool executions
-  error, // Any error that occurred
-  sendMessage, // Send a new message
-  cancel, // Cancel current request
-  reset, // Reset conversation
+  messages,          // Conversation history
+  isLoading,         // Currently processing
+  streamingContent,  // Partial response being streamed
+  currentToolCalls,  // Active tool executions
+  error,             // Any error that occurred
+  stats,             // NEW: Cost and token tracking
+  sendMessage,       // Send a new message
+  cancel,            // Cancel current request
+  reset,             // Reset conversation
 } = useAgent(agent);
 ```
 
@@ -451,6 +508,238 @@ const tool = defineTool({
   parameters: z.object({ ... }),
   execute: async (params, context) => { ... },
 });
+```
+
+## Inline Agent Definitions (Claude SDK-style)
+
+Define sub-agents declaratively within `createAgent()` using the `agents` option. This is cleaner than manually creating sub-agent tools:
+
+```typescript
+const orchestrator = createAgent({
+  name: 'research-orchestrator',
+  systemPrompt: 'You coordinate research tasks...',
+  model: 'google:gemini-2.5-pro',
+  tools: createToolsRecord([exaSearchTool, readPdfTool]),
+
+  agents: {
+    'web-researcher': {
+      description: 'Specialist for web research and news gathering',
+      prompt: `You are a web research expert. Search for information
+and synthesize findings into clear summaries.`,
+      tools: ['exa_search', 'exa_get_contents'],  // Reference parent tools by name
+      model: 'haiku',  // Use lighter model for cost efficiency
+      maxSteps: 8,
+    },
+
+    'document-analyzer': {
+      description: 'PDF and document analysis specialist',
+      prompt: 'You analyze documents and extract key information.',
+      tools: ['list_pdfs', 'read_pdf'],
+      model: 'sonnet',
+    },
+  },
+});
+```
+
+**AgentDefinition options:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `description` | string | required | When to use this agent (shown to LLM) |
+| `prompt` | string | required | Sub-agent's system prompt |
+| `tools` | string[] or ToolDef[] | inherit all | Tools available (names or definitions) |
+| `model` | string | 'sonnet' | Model alias or full spec |
+| `maxSteps` | number | 10 | Maximum agentic steps |
+
+**Model aliases:** `'opus'`, `'sonnet'`, `'haiku'` → resolved to full Anthropic model IDs.
+
+## Hooks System
+
+Intercept and customize tool execution with hooks:
+
+```typescript
+const agent = createAgent({
+  name: 'secure-agent',
+  systemPrompt: '...',
+  tools: { ... },
+
+  hooks: {
+    // Called before each tool execution
+    onBeforeToolCall: async (toolName, input, context) => {
+      // Audit logging
+      console.log(`[${new Date().toISOString()}] ${toolName}`, input);
+
+      // Block dangerous operations
+      if (toolName === 'bash' && input.command?.includes('rm -rf')) {
+        return {
+          action: 'deny',
+          denyReason: 'Destructive commands not allowed'
+        };
+      }
+
+      // Modify input
+      if (toolName === 'fetch_page') {
+        return {
+          action: 'modify',
+          modifiedInput: { ...input, timeout: 5000 },
+        };
+      }
+
+      return { action: 'allow' };
+    },
+
+    // Called after each tool execution
+    onAfterToolCall: async (toolName, input, result, context) => {
+      // Log results
+      console.log(`${toolName} completed in ${context.duration}ms`);
+
+      // Optionally transform result
+      if (toolName === 'read_file' && result.content) {
+        return {
+          modifiedResult: {
+            ...result,
+            content: result.content.slice(0, 10000), // Truncate
+          },
+        };
+      }
+
+      return {};
+    },
+
+    // Called when agent starts processing
+    onStart: async (message) => {
+      console.log('Processing:', message);
+    },
+
+    // Called when agent finishes
+    onFinish: async (response, stats) => {
+      console.log(`Done! Cost: $${stats.costUSD.toFixed(4)}`);
+    },
+  },
+});
+```
+
+**Hook actions:**
+- `{ action: 'allow' }` - Proceed with tool execution
+- `{ action: 'deny', denyReason: '...' }` - Block tool, return error to LLM
+- `{ action: 'modify', modifiedInput: {...} }` - Transform input before execution
+
+## Structured Output
+
+Get typed JSON responses using Zod schemas:
+
+```typescript
+import { z } from 'zod';
+
+// Define output schema
+const ReviewSchema = z.object({
+  score: z.number().min(0).max(100),
+  summary: z.string(),
+  issues: z.array(z.object({
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    file: z.string(),
+    line: z.number().optional(),
+    description: z.string(),
+    suggestion: z.string().optional(),
+  })),
+});
+
+// Option 1: Set schema in config
+const agent = createAgent({
+  name: 'code-reviewer',
+  systemPrompt: 'Review code and return structured feedback.',
+  outputSchema: ReviewSchema,
+});
+
+const { data, stats } = await agent.sendMessageStructured('Review auth.ts');
+// data is typed as z.infer<typeof ReviewSchema>
+
+// Option 2: Pass schema per-call
+const { data } = await agent.sendMessageStructured(
+  'Analyze this codebase',
+  ReviewSchema
+);
+```
+
+## Cost Tracking
+
+Track token usage and costs across main agent and sub-agents:
+
+```typescript
+const agent = createAgent({ ... });
+
+// After processing
+const stats = agent.getStats();
+console.log(`Total cost: $${stats.costUSD.toFixed(4)}`);
+console.log(`Total tokens: ${stats.totalTokens}`);
+console.log(`Tool calls: ${stats.toolCallCount}`);
+console.log(`Duration: ${stats.duration}ms`);
+
+// Per-model breakdown (useful with sub-agents)
+for (const [model, usage] of Object.entries(stats.modelUsage)) {
+  console.log(`${model}: $${usage.costUSD.toFixed(4)} (${usage.usage.totalTokens} tokens)`);
+}
+```
+
+**AgentStats interface:**
+
+```typescript
+interface AgentStats {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  costUSD: number;
+  toolCallCount: number;
+  duration: number;
+  modelUsage: Record<string, CostTracking>;
+}
+```
+
+Supported models with pricing:
+- Anthropic: claude-opus-4-5, claude-sonnet-4-5, claude-sonnet-4, claude-haiku-3-5
+- Google: gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash, gemini-3-pro, gemini-3-flash
+
+## Session Management
+
+Save and restore conversations for multi-turn workflows:
+
+```typescript
+const agent = createAgent({ name: 'assistant', ... });
+
+// Have a conversation
+await agent.sendMessage('Analyze the codebase', onEvent);
+await agent.sendMessage('What are the main issues?', onEvent);
+
+// Export session for later
+const session = agent.exportSession();
+// session = { id, agentName, createdAt, updatedAt, messages, stats }
+
+// Save to file/database
+await fs.writeFile('session.json', JSON.stringify(session));
+
+// Later: restore and continue
+const savedSession = JSON.parse(await fs.readFile('session.json', 'utf-8'));
+const newAgent = createAgent({ name: 'assistant', ... });
+newAgent.importSession(savedSession);
+
+// Continue conversation with full context
+await newAgent.sendMessage('Show me how to fix the top issue', onEvent);
+
+// Get current session ID
+const sessionId = agent.getSessionId();
+```
+
+**AgentSession interface:**
+
+```typescript
+interface AgentSession {
+  id: string;
+  agentName: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: CoreMessage[];
+  stats: AgentStats;
+}
 ```
 
 ## Hierarchical Agents (Orchestrator-Workers)

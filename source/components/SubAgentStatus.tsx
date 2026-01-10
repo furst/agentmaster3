@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Spinner as InkSpinner } from '@inkjs/ui';
 import { formatDuration, truncate } from '../utils/format.js';
+import { parseModelDisplay } from '../utils/model.js';
 import {
 	agentEvents,
 	type AgentBusEvent,
@@ -29,6 +30,7 @@ interface SubAgentState {
 	processId: string;
 	agentName: string;
 	task: string;
+	model: string;
 	status: 'running' | 'success' | 'error';
 	startTime: number;
 	endTime?: number;
@@ -249,6 +251,9 @@ function SubAgentItem({
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(' ');
 
+	// Format model name for display
+	const modelDisplay = parseModelDisplay(agent.model).shortName;
+
 	if (compact) {
 		return (
 			<Box>
@@ -257,6 +262,7 @@ function SubAgentItem({
 				<Text color={statusColor} bold>
 					{displayName}
 				</Text>
+				<Text color="magenta" dimColor> [{modelDisplay}]</Text>
 				<Text color="gray"> ({statusText})</Text>
 				{agent.status === 'running' && displayTools.length > 0 && (
 					<Text color="gray" dimColor>
@@ -277,6 +283,7 @@ function SubAgentItem({
 				<Text color={statusColor} bold>
 					{displayName}
 				</Text>
+				<Text color="magenta" dimColor> [{modelDisplay}]</Text>
 				<Text color="gray"> ({statusText})</Text>
 			</Box>
 
@@ -334,6 +341,7 @@ export function SubAgentStatus({
 					processId: event.processId,
 					agentName: event.agentName,
 					task: event.task,
+					model: event.model,
 					status: 'running',
 					startTime: event.timestamp,
 					toolCalls: new Map(),

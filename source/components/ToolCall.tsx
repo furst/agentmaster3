@@ -7,7 +7,7 @@ export interface ToolCallProps {
 	/** Tool name */
 	name: string;
 	/** Current status */
-	status: 'pending' | 'running' | 'complete' | 'error';
+	status: 'pending' | 'running' | 'complete' | 'error' | 'denied';
 	/** Tool input arguments */
 	input?: Record<string, unknown>;
 	/** Tool output/result */
@@ -179,12 +179,14 @@ export function ToolCall({
 				return <Text color="green">✓</Text>;
 			case 'error':
 				return <Text color="red">✗</Text>;
+			case 'denied':
+				return <Text color="yellow">⊘</Text>;
 		}
 	};
 
 	// Get result metadata
 	const metadata = status === 'complete' ? extractResultMetadata(name, output) : null;
-	const errorMessage = status === 'error' && error ? truncate(error, 40) : null;
+	const errorMessage = (status === 'error' || status === 'denied') && error ? truncate(error, 40) : null;
 
 	// Format duration
 	const durationStr = duration ? formatDuration(duration) : null;
@@ -196,7 +198,7 @@ export function ToolCall({
 		<Box>
 			<StatusIndicator />
 			<Text> </Text>
-			<Text color={status === 'running' ? 'cyan' : status === 'error' ? 'red' : 'white'} bold>
+			<Text color={status === 'running' ? 'cyan' : status === 'error' ? 'red' : status === 'denied' ? 'yellow' : 'white'} bold>
 				{name}
 			</Text>
 
@@ -250,7 +252,7 @@ export interface ToolCallListProps {
 		id: string;
 		toolCallId: string;
 		name: string;
-		status: 'pending' | 'running' | 'complete' | 'error';
+		status: 'pending' | 'running' | 'complete' | 'error' | 'denied';
 		args?: unknown;
 		result?: unknown;
 		error?: string;
