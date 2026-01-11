@@ -12,7 +12,7 @@ export { readMindsetTool, saveMindsetTool } from './mindset.js';
 export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 export { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
 export { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
-export { createPlanTool, updatePlanStepTool, readPlanTool } from './agent-planning.js';
+export { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
 
 import { readFileTool } from './read-file.js';
 import { webSearchTool } from './web-search.js';
@@ -24,7 +24,7 @@ import { readMindsetTool, saveMindsetTool } from './mindset.js';
 import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
-import { createPlanTool, updatePlanStepTool, readPlanTool } from './agent-planning.js';
+import { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
 import { createToolsRecord } from '../core/tools.js';
 
 /**
@@ -50,9 +50,10 @@ export const allTools = [
 	saveResearchNoteTool,
 	readResearchNotesTool,
 	listResearchNotesTool,
-	createPlanTool,
-	updatePlanStepTool,
-	readPlanTool,
+	createTodosTool,
+	updateTodoTool,
+	getTodosTool,
+	clearTodosTool,
 ];
 
 /**
@@ -68,7 +69,8 @@ export const toolCategories = {
 	web: [webSearchTool, exaSearchTool, exaGetContentsTool, jinaReaderTool],
 	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool, parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool],
 	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
-	planning: [createPlanTool, updatePlanStepTool, readPlanTool, saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
+	research: [saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
+	productivity: [createTodosTool, updateTodoTool, getTodosTool, clearTodosTool],
 } as const;
 
 /**

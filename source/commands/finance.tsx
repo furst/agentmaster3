@@ -13,7 +13,7 @@ import { createWebResearchAgent } from "../agents/web-research-agent.js";
 // Direct tools (finance-specific)
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
-import { createPlanTool, updatePlanStepTool, readPlanTool } from "../tools/agent-planning.js";
+import { createTodosTool, updateTodoTool, getTodosTool } from "../tools/session-todo.js";
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from "../tools/research-notes.js";
 
 export const options = z.object({
@@ -64,8 +64,8 @@ function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string 
       { name: "parse_holdings_image", description: "Parse holdings from screenshot" },
       { name: "read_mindset", description: "Read user's investment philosophy" },
       { name: "save_mindset", description: "Update investment philosophy" },
-      { name: "create_plan", description: "Create multi-step research plan" },
-      { name: "update_plan_step", description: "Update plan progress" },
+      { name: "create_todos", description: "Create task list for complex research" },
+      { name: "update_todo", description: "Update task progress" },
       { name: "save_research_note", description: "Save research findings" },
     ],
 
@@ -119,9 +119,9 @@ export default function Finance({ options }: Props) {
           parseHoldingsImageTool,
           readHoldingsTool,
           listHoldingsImagesTool,
-          createPlanTool,
-          updatePlanStepTool,
-          readPlanTool,
+          createTodosTool,
+          updateTodoTool,
+          getTodosTool,
           saveResearchNoteTool,
           readResearchNotesTool,
           listResearchNotesTool,

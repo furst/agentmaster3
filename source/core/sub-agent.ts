@@ -146,6 +146,7 @@ export function createSubAgentTool(config: SubAgentConfig): {
 					tools: toolsRecord,
 					stopWhen: stepCountIs(maxSteps),
 					maxOutputTokens,
+					abortSignal: context?.abortSignal,
 					onStepFinish: (step) => {
 						// Process each tool call in this step
 						const stepToolCalls = step.toolCalls ?? [];
@@ -255,13 +256,19 @@ export function createSubAgentTool(config: SubAgentConfig): {
 				const err = error instanceof Error ? error : new Error(String(error));
 				const duration = Date.now() - startTime;
 
-				// Emit error finish event
+				// Check if this was an abort
+				const isAborted =
+					err.name === 'AbortError' ||
+					err.message.includes('aborted') ||
+					context?.abortSignal?.aborted;
+
+				// Emit error/cancelled finish event
 				agentEvents.emit({
 					type: 'subAgentFinish',
 					processId,
 					agentName: name,
 					status: 'error',
-					error: err.message,
+					error: isAborted ? 'Cancelled' : err.message,
 					duration,
 					toolCallCount: toolCallSummaries.length,
 					timestamp: Date.now(),
@@ -275,7 +282,7 @@ export function createSubAgentTool(config: SubAgentConfig): {
 					toolCallCount: toolCallSummaries.length,
 					toolCalls: toolCallSummaries,
 					duration,
-					error: err.message,
+					error: isAborted ? 'Cancelled' : err.message,
 				};
 
 				return errorResult;

@@ -47,11 +47,40 @@ export interface SubAgentFinishEvent {
 	timestamp: number;
 }
 
+export interface TodoUpdateEvent {
+	type: 'todoUpdate';
+	sessionId: string;
+	action: 'create' | 'update' | 'complete' | 'clear';
+	todos: Array<{
+		id: string;
+		content: string;
+		status: 'pending' | 'in_progress' | 'completed';
+	}>;
+	timestamp: number;
+}
+
+export interface PlanUpdateEvent {
+	type: 'planUpdate';
+	sessionId: string;
+	action: 'create' | 'update' | 'approve' | 'cancel' | 'complete';
+	plan: {
+		objective: string;
+		steps: Array<{
+			id: string;
+			description: string;
+		}>;
+		status: 'draft' | 'approved' | 'executing' | 'completed' | 'cancelled';
+	} | null;
+	timestamp: number;
+}
+
 export type AgentBusEvent =
 	| SubAgentStartEvent
 	| SubAgentToolCallEvent
 	| SubAgentLogEvent
-	| SubAgentFinishEvent;
+	| SubAgentFinishEvent
+	| TodoUpdateEvent
+	| PlanUpdateEvent;
 
 export type AgentEventType = AgentBusEvent['type'] | 'all';
 
@@ -118,9 +147,10 @@ export function generateProcessId(): string {
 /**
  * Creates a filter function for events by processId
  * Useful for UI components that only care about specific sub-agents
+ * Note: Only filters events that have a processId (excludes TodoUpdateEvent)
  */
 export function filterByProcess(processId: string): (event: AgentBusEvent) => boolean {
-	return (event: AgentBusEvent) => event.processId === processId;
+	return (event: AgentBusEvent) => 'processId' in event && event.processId === processId;
 }
 
 /**

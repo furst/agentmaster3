@@ -259,16 +259,13 @@ export function createAgent(config: AgentConfig) {
 	};
 
 	/**
-	 * Wraps tools with hook support
+	 * Wraps tools with session context and hook support
+	 * Always wraps to inject sessionId, adds hook support if hooks are defined
 	 */
-	function wrapToolsWithHooks(
+	function wrapToolsWithSession(
 		tools: Record<string, CoreTool>,
 		hookContext: Omit<ToolHookContext, 'toolCallId'>
 	): Record<string, CoreTool> {
-		if (!hooks.onBeforeToolCall && !hooks.onAfterToolCall) {
-			return tools;
-		}
-
 		const wrappedTools: Record<string, CoreTool> = {};
 
 		for (const [toolName, tool] of Object.entries(tools)) {
@@ -298,9 +295,13 @@ export function createAgent(config: AgentConfig) {
 						}
 					}
 
-					// Execute original tool
+					// Execute original tool with sessionId injected into context
 					const startTime = Date.now();
-					const result = await (tool.execute as (params: Record<string, unknown>, context: { toolCallId: string; messages: unknown[]; abortSignal?: AbortSignal }) => Promise<unknown>)(params, context);
+					const contextWithSession = {
+						...context,
+						sessionId: currentSessionId,
+					};
+					const result = await (tool.execute as (params: Record<string, unknown>, context: { toolCallId: string; messages: unknown[]; abortSignal?: AbortSignal; sessionId?: string }) => Promise<unknown>)(params, contextWithSession);
 					const duration = Date.now() - startTime;
 
 					// After hook
@@ -379,8 +380,8 @@ export function createAgent(config: AgentConfig) {
 		let toolCallIdCounter = 0;
 		let messageToolCallCount = 0;
 
-		// Wrap tools with hooks
-		const wrappedTools = wrapToolsWithHooks(allTools, {
+		// Wrap tools with session context and hooks
+		const wrappedTools = wrapToolsWithSession(allTools, {
 			agentName: name,
 			messages: conversationHistory,
 		});
@@ -483,6 +484,10 @@ export function createAgent(config: AgentConfig) {
 			};
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
+			// Abort any running sub-agents when main agent errors
+			if (abortController) {
+				abortController.abort();
+			}
 			onEvent({ type: 'error', error: err });
 			throw err;
 		} finally {

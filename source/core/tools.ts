@@ -15,6 +15,7 @@ export interface ToolContext {
 	toolCallId: string;
 	messages: unknown[];
 	abortSignal?: AbortSignal;
+	sessionId?: string;
 }
 
 /**
@@ -38,6 +39,7 @@ interface ToolExecuteContext {
 	toolCallId: string;
 	messages: unknown[];
 	abortSignal?: AbortSignal;
+	sessionId?: string;
 }
 
 export function defineTool<T extends z.ZodObject<z.ZodRawShape>>(
@@ -53,6 +55,7 @@ export function defineTool<T extends z.ZodObject<z.ZodRawShape>>(
 				toolCallId: context.toolCallId,
 				messages: context.messages,
 				abortSignal: context.abortSignal,
+				sessionId: context.sessionId,
 			};
 			return execute(params, toolContext);
 		},

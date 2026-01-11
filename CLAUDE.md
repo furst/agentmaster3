@@ -23,7 +23,8 @@ source/
 │   ├── llm.ts          # Anthropic client wrapper
 │   ├── tools.ts        # Tool definition helpers
 │   ├── agent.ts        # Agent factory + useAgent hook
-│   ├── events.ts       # Event bus for sub-agent communication
+│   ├── events.ts       # Event bus for sub-agent/todo communication
+│   ├── session-todo.ts # Session-scoped todo state management
 │   └── sub-agent.ts    # Sub-agent factory (hierarchical agents)
 ├── agents/             # Reusable sub-agent definitions
 │   ├── index.ts        # Exports all sub-agents
@@ -36,6 +37,7 @@ source/
 │   ├── ContentCard.tsx # Highlighted content boxes for important data
 │   ├── ToolCall.tsx    # Tool call visualization (Claude Code-inspired)
 │   ├── SubAgentStatus.tsx # Sub-agent progress visualization
+│   ├── TodoList.tsx    # Session-scoped todo list display
 │   ├── ModelIndicator.tsx # Displays current model and reasoning status in header
 │   ├── Timeline.tsx    # Status timeline
 │   ├── Spinner.tsx     # Loading indicators
@@ -51,7 +53,7 @@ source/
 │   ├── obsidian-vault.ts # Read/write markdown notes in Obsidian vault
 │   ├── holdings.ts     # Parse and read stock holdings
 │   ├── research-notes.ts # Save/read research findings
-│   ├── agent-planning.ts # Plan creation and tracking for complex tasks
+│   ├── session-todo.ts # Session-scoped todo list management
 │   └── index.ts        # Tool registry
 └── utils/
     ├── format.ts       # Text formatting helpers
@@ -248,27 +250,34 @@ import { searchVaultTool } from '../tools/obsidian-vault.js';
 // Example: "beef recipe" finds notes containing both "beef" AND "recipe" (or fuzzy variants like "recipes")
 ```
 
-### createPlanTool (create_plan)
-Create a structured research plan with numbered steps. For complex multi-step tasks.
+### createTodosTool (create_todos)
+Create a session-scoped todo list for tracking complex multi-step tasks. Persists to disk.
 ```typescript
-import { createPlanTool } from '../tools/agent-planning.js';
-// Parameters: { title, objective, steps: string[] }
-// Returns: { success, planId, title, objective, stepCount, steps }
+import { createTodosTool } from '../tools/session-todo.js';
+// Parameters: { items: string[] }
+// Returns: { success, sessionId, todoCount, todos: [{ id, content, status }] }
 ```
 
-### updatePlanStepTool (update_plan_step)
-Update plan step status, add findings, or manage the entire plan.
+### updateTodoTool (update_todo)
+Update the status of a todo item. Mark as in_progress when starting, completed when done.
 ```typescript
-import { updatePlanStepTool } from '../tools/agent-planning.js';
-// Parameters: { stepId?, status?, findings?, abandonPlan?, completePlan? }
-// Returns: { success, action, stepId, newStatus, progress }
+import { updateTodoTool } from '../tools/session-todo.js';
+// Parameters: { todoId, status: 'in_progress' | 'completed' }
+// Returns: { success, todoId, newStatus, content, progress }
 ```
 
-### readPlanTool (read_plan)
-Read current research plan status and progress.
+### getTodosTool (get_todos)
+Get the current todo list and progress for this session.
 ```typescript
-import { readPlanTool } from '../tools/agent-planning.js';
-// Returns: { success, hasActivePlan, planId, title, objective, status, progress, steps }
+import { getTodosTool } from '../tools/session-todo.js';
+// Returns: { success, hasTodos, progress, inProgress, todos }
+```
+
+### clearTodosTool (clear_todos)
+Clear all todos for this session.
+```typescript
+import { clearTodosTool } from '../tools/session-todo.js';
+// Returns: { success, message }
 ```
 
 ### saveResearchNoteTool (save_research_note)

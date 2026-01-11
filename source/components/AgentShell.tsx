@@ -1,13 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { MessageList } from './Message.js';
 import { ToolCallList } from './ToolCall.js';
 import { SubAgentStatus } from './SubAgentStatus.js';
+import { TodoList } from './TodoList.js';
+import { PlanReview, PlanModeIndicator } from './PlanReview.js';
 import { InlineTimeline } from './Timeline.js';
 import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
 import { ModelIndicator } from './ModelIndicator.js';
 import { useAgent, type Agent } from '../core/agent.js';
+import {
+	createPlan,
+	approvePlan,
+	cancelPlan,
+	parsePlanFromText,
+	loadPlan,
+	clearPlan,
+	type Plan,
+} from '../core/session-plan.js';
+
+// Planning prompt markers for filtering
+const PLAN_PROMPT_MARKERS = [
+	'You are in PLANNING MODE',
+	'Revise the plan based on this feedback:',
+	'The user has approved this plan. Now execute it',
+];
+
+/**
+ * Check if a message is an internal planning prompt that should be hidden
+ */
+function isPlanningMessage(content: string): boolean {
+	return PLAN_PROMPT_MARKERS.some((marker) => content.startsWith(marker));
+}
 
 export interface AgentShellProps {
 	/** The agent instance to use */
@@ -56,20 +81,36 @@ export function AgentShell({
 	// Key to force re-mount TextInput after submission (clears the input)
 	const [inputKey, setInputKey] = useState(0);
 
-	// Handle initial prompt
+	// Plan mode state
+	const [planModeEnabled, setPlanModeEnabled] = useState(false);
+	const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
+	const [isPlanProcessing, setIsPlanProcessing] = useState(false);
+	const pendingPromptRef = useRef<string | null>(null);
+
+	// Load any existing plan on mount
 	useEffect(() => {
-		if (initialPrompt && !hasStarted) {
+		const existingPlan = loadPlan(agent.getSessionId());
+		if (existingPlan && existingPlan.status === 'draft') {
+			setCurrentPlan(existingPlan);
+			setPlanModeEnabled(true);
+		}
+	}, [agent]);
+
+	// Handle initial prompt (skip if plan mode would interfere)
+	useEffect(() => {
+		if (initialPrompt && !hasStarted && !planModeEnabled) {
 			setHasStarted(true);
 			sendMessage(initialPrompt);
 		}
-	}, [initialPrompt, hasStarted, sendMessage]);
+	}, [initialPrompt, hasStarted, sendMessage, planModeEnabled]);
 
 	// Handle keyboard shortcuts
 	useInput((input, key) => {
 		// Ctrl+C to cancel current operation or exit
 		if (key.ctrl && input === 'c') {
-			if (isLoading) {
+			if (isLoading || isPlanProcessing) {
 				cancel();
+				setIsPlanProcessing(false);
 			} else {
 				exit();
 			}
@@ -79,21 +120,167 @@ export function AgentShell({
 		// Ctrl+R to reset conversation
 		if (key.ctrl && input === 'r') {
 			reset();
-			setInputKey((k) => k + 1); // Reset input field too
+			setCurrentPlan(null);
+			clearPlan(agent.getSessionId());
+			setInputKey((k) => k + 1);
+			return;
+		}
+
+		// Shift+Tab to toggle plan mode
+		if (key.shift && key.tab) {
+			if (!isLoading && !isPlanProcessing && !currentPlan) {
+				setPlanModeEnabled((prev) => !prev);
+			}
 			return;
 		}
 	});
 
+	// Create a plan from user prompt
+	const createPlanFromPrompt = useCallback(
+		async (prompt: string) => {
+			setIsPlanProcessing(true);
+			pendingPromptRef.current = prompt;
+
+			// Ask agent to create a plan
+			const planPrompt = `You are in PLANNING MODE. Do NOT execute the task yet. Instead, create a plan.
+
+User request: "${prompt}"
+
+Create a structured plan with:
+1. A clear objective (one sentence)
+2. Numbered steps to achieve it (be specific)
+
+Format your response EXACTLY like this:
+**Objective:** [Your objective here]
+
+**Steps:**
+1. [First step]
+2. [Second step]
+3. [Third step]
+...
+
+IMPORTANT: Only output the plan. Do not start executing it.`;
+
+			try {
+				await sendMessage(planPrompt);
+			} finally {
+				setIsPlanProcessing(false);
+			}
+		},
+		[sendMessage]
+	);
+
+	// Parse plan from agent response
+	useEffect(() => {
+		if (!isPlanProcessing && pendingPromptRef.current && messages.length > 0) {
+			const lastMessage = messages[messages.length - 1];
+			if (lastMessage?.role === 'assistant' && lastMessage.content) {
+				const parsed = parsePlanFromText(lastMessage.content);
+				if (parsed && parsed.steps.length > 0) {
+					const plan = createPlan(
+						agent.getSessionId(),
+						pendingPromptRef.current,
+						parsed.objective,
+						parsed.steps
+					);
+					setCurrentPlan(plan);
+					pendingPromptRef.current = null;
+				}
+			}
+		}
+	}, [messages, isPlanProcessing, agent]);
+
+	// Handle plan approval
+	const handlePlanApprove = useCallback(() => {
+		if (!currentPlan) return;
+
+		const result = approvePlan(agent.getSessionId(), agent.name);
+		if (result) {
+			setCurrentPlan(null);
+			// Disable plan mode after approval - continue as normal chat
+			setPlanModeEnabled(false);
+
+			// Build step list with todo IDs so agent knows which to update
+			const stepsWithIds = result.plan.steps
+				.map((s, i) => `${i + 1}. ${s.description} (todo_id: ${result.todoIds[i]})`)
+				.join('\n');
+
+			// Execute the original prompt
+			const executePrompt = `The user has approved this plan. Now execute it step by step.
+
+Original request: "${result.plan.originalPrompt}"
+
+Plan steps (with todo IDs):
+${stepsWithIds}
+
+IMPORTANT: As you complete each step, call update_todo with the corresponding todo_id to mark it as completed. Do NOT create new todos - use the existing ones listed above.`;
+
+			sendMessage(executePrompt);
+		}
+	}, [currentPlan, agent, sendMessage]);
+
+	// Handle plan edit request
+	const handlePlanEdit = useCallback(
+		async (feedback: string) => {
+			if (!currentPlan) return;
+
+			setIsPlanProcessing(true);
+
+			const editPrompt = `Revise the plan based on this feedback:
+
+Original request: "${currentPlan.originalPrompt}"
+
+Current plan:
+${currentPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join('\n')}
+
+User feedback: "${feedback}"
+
+Provide a revised plan in the same format:
+**Objective:** [Your objective here]
+
+**Steps:**
+1. [First step]
+2. [Second step]
+...`;
+
+			pendingPromptRef.current = currentPlan.originalPrompt;
+
+			try {
+				await sendMessage(editPrompt);
+			} finally {
+				setIsPlanProcessing(false);
+			}
+		},
+		[currentPlan, sendMessage]
+	);
+
+	// Handle plan cancellation
+	const handlePlanCancel = useCallback(() => {
+		if (currentPlan) {
+			cancelPlan(agent.getSessionId());
+		}
+		setCurrentPlan(null);
+		setPlanModeEnabled(false);
+		pendingPromptRef.current = null;
+	}, [currentPlan, agent]);
+
 	// Handle input submission
 	const handleSubmit = useCallback(
 		(value: string) => {
-			if (!value.trim() || isLoading) return;
+			if (!value.trim() || isLoading || isPlanProcessing) return;
 			setHasStarted(true);
-			sendMessage(value.trim());
+
+			// If plan mode is enabled and no current plan, create one first
+			if (planModeEnabled && !currentPlan) {
+				createPlanFromPrompt(value.trim());
+			} else {
+				sendMessage(value.trim());
+			}
+
 			// Force re-mount to clear input
 			setInputKey((k) => k + 1);
 		},
-		[isLoading, sendMessage]
+		[isLoading, isPlanProcessing, planModeEnabled, currentPlan, sendMessage, createPlanFromPrompt]
 	);
 
 	// Determine current status for timeline
@@ -111,6 +298,24 @@ export function AgentShell({
 	const currentStatus = getStatus();
 	const runningTool = currentToolCalls.find((tc) => tc.status === 'running');
 
+	// Filter out internal planning messages from display
+	const displayMessages = useMemo(() => {
+		return messages.filter((msg) => {
+			// Only filter user messages that are internal planning prompts
+			if (msg.role === 'user' && isPlanningMessage(msg.content)) {
+				return false;
+			}
+			// Hide assistant plan response if we're showing PlanReview
+			if (msg.role === 'assistant' && currentPlan?.status === 'draft') {
+				// Check if this is the plan response (contains objective + steps format)
+				if (msg.content.includes('**Objective:**') && msg.content.includes('**Steps:**')) {
+					return false;
+				}
+			}
+			return true;
+		});
+	}, [messages, currentPlan]);
+
 	return (
 		<Box flexDirection="column" padding={1}>
 			{/* Header */}
@@ -121,9 +326,10 @@ export function AgentShell({
 					</Text>
 					<Text color="gray"> | </Text>
 					<ModelIndicator model={agent.model} reasoning={agent.reasoning} />
+					<PlanModeIndicator enabled={planModeEnabled} />
 					<Text color="gray"> | </Text>
 					<Text color="gray" dimColor>
-						Ctrl+C to {isLoading ? 'cancel' : 'exit'}, Ctrl+R to reset
+						Shift+Tab: plan mode, Ctrl+C: {isLoading || isPlanProcessing ? 'cancel' : 'exit'}
 					</Text>
 				</Box>
 			)}
@@ -136,7 +342,7 @@ export function AgentShell({
 			)}
 
 			{/* Message history */}
-			<MessageList messages={messages} streamingContent={streamingContent} />
+			<MessageList messages={displayMessages} streamingContent={streamingContent} />
 
 			{/* Tool calls section */}
 			{currentToolCalls.length > 0 && (
@@ -152,6 +358,20 @@ export function AgentShell({
 
 			{/* Sub-agent status section */}
 			{isLoading && <SubAgentStatus showCompletedTools={true} maxToolCalls={5} />}
+
+			{/* Todo list section */}
+			<TodoList sessionId={agent.getSessionId()} maxItems={10} />
+
+			{/* Plan review section */}
+			{currentPlan && currentPlan.status === 'draft' && (
+				<PlanReview
+					plan={currentPlan}
+					onApprove={handlePlanApprove}
+					onEdit={handlePlanEdit}
+					onCancel={handlePlanCancel}
+					isProcessing={isPlanProcessing}
+				/>
+			)}
 
 			{/* Error display */}
 			{error && (
@@ -183,17 +403,25 @@ export function AgentShell({
 			</Box>
 
 			{/* Input field */}
-			<Box>
-				<Text color={color} bold>
-					{'> '}
-				</Text>
-				<TextInput
-					key={inputKey}
-					placeholder={isLoading ? 'Processing...' : placeholder}
-					onSubmit={handleSubmit}
-					isDisabled={isLoading}
-				/>
-			</Box>
+			{!currentPlan && (
+				<Box>
+					<Text color={planModeEnabled ? 'cyan' : color} bold>
+						{planModeEnabled ? '📋 ' : '> '}
+					</Text>
+					<TextInput
+						key={inputKey}
+						placeholder={
+							isLoading || isPlanProcessing
+								? 'Processing...'
+								: planModeEnabled
+									? 'Describe your task (will create plan first)...'
+									: placeholder
+						}
+						onSubmit={handleSubmit}
+						isDisabled={isLoading || isPlanProcessing}
+					/>
+				</Box>
+			)}
 		</Box>
 	);
 }
