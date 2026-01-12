@@ -8,29 +8,7 @@ import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
 import { ModelIndicator } from './ModelIndicator.js';
 import { type Agent } from '../core/agent.js';
 import { useAgentTimeline } from '../core/timeline.js';
-import {
-	createPlan,
-	approvePlan,
-	cancelPlan,
-	parsePlanFromText,
-	loadPlan,
-	clearPlan,
-	type Plan,
-} from '../core/session-plan.js';
-
-// Planning prompt markers for filtering
-const PLAN_PROMPT_MARKERS = [
-	'You are in PLANNING MODE',
-	'Revise the plan based on this feedback:',
-	'The user has approved this plan. Now execute it',
-];
-
-/**
- * Check if a message is an internal planning prompt that should be hidden
- */
-function isPlanningMessage(content: string): boolean {
-	return PLAN_PROMPT_MARKERS.some((marker) => content.startsWith(marker));
-}
+import { usePlanMode, isPlanningMessage } from '../core/plan-mode.js';
 
 export interface AgentShellProps {
 	/** The agent instance to use */
@@ -81,26 +59,36 @@ export function AgentShell({
 	// Key to force re-mount TextInput after submission (clears the input)
 	const [inputKey, setInputKey] = useState(0);
 
-	// Plan mode state
-	const [planModeEnabled, setPlanModeEnabled] = useState(false);
-	const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
-	const [isPlanProcessing, setIsPlanProcessing] = useState(false);
-	const pendingPromptRef = useRef<string | null>(null);
+	// Plan mode state and handlers from custom hook
+	const {
+		planModeEnabled,
+		currentPlan,
+		isPlanProcessing,
+		togglePlanMode,
+		createPlanFromPrompt,
+		handlePlanApprove,
+		handlePlanEdit,
+		handlePlanCancel,
+		resetPlanState,
+		loadExistingPlan,
+	} = usePlanMode({
+		agent,
+		sendMessage,
+		addUserMessage,
+		messages,
+	});
 
 	// Track initialization state with ref to prevent race conditions
 	const isInitializedRef = useRef(false);
 
 	// Combined initialization effect - handles both plan loading and initial prompt
-	// This prevents race conditions between separate effects
 	useEffect(() => {
 		if (isInitializedRef.current) return;
 		isInitializedRef.current = true;
 
 		// First, check for existing plan (synchronous)
-		const existingPlan = loadPlan(agent.getSessionId());
-		if (existingPlan && existingPlan.status === 'draft') {
-			setCurrentPlan(existingPlan);
-			setPlanModeEnabled(true);
+		const existingPlan = loadExistingPlan();
+		if (existingPlan) {
 			// Don't send initial prompt when resuming a plan
 			return;
 		}
@@ -110,7 +98,7 @@ export function AgentShell({
 			setHasStarted(true);
 			sendMessage(initialPrompt);
 		}
-	}, [agent, initialPrompt, sendMessage]);
+	}, [initialPrompt, sendMessage, loadExistingPlan]);
 
 	// Handle keyboard shortcuts
 	useInput((input, key) => {
@@ -118,7 +106,6 @@ export function AgentShell({
 		if (key.ctrl && input === 'c') {
 			if (isLoading || isPlanProcessing) {
 				cancel();
-				setIsPlanProcessing(false);
 			} else {
 				exit();
 			}
@@ -128,8 +115,7 @@ export function AgentShell({
 		// Ctrl+R to reset conversation
 		if (key.ctrl && input === 'r') {
 			reset();
-			setCurrentPlan(null);
-			clearPlan(agent.getSessionId());
+			resetPlanState();
 			setInputKey((k) => k + 1);
 			return;
 		}
@@ -137,155 +123,11 @@ export function AgentShell({
 		// Shift+Tab to toggle plan mode
 		if (key.shift && key.tab) {
 			if (!isLoading && !isPlanProcessing && !currentPlan) {
-				setPlanModeEnabled((prev) => !prev);
+				togglePlanMode();
 			}
 			return;
 		}
 	});
-
-	// Create a plan from user prompt
-	const createPlanFromPrompt = useCallback(
-		async (prompt: string) => {
-			setIsPlanProcessing(true);
-			pendingPromptRef.current = prompt;
-
-			// Add user's actual prompt to timeline first
-			addUserMessage(prompt);
-
-			// Ask agent to create a plan - with research phase first
-			const planPrompt = `You are in PLANNING MODE. Your job is to create an informed, concrete plan.
-
-User request: "${prompt}"
-
-IMPORTANT: Do research FIRST, then plan.
-
-1. RESEARCH PHASE: Use your tools to gather the information needed to understand the task
-   - Read relevant files, fetch pages, check current state
-   - Get concrete details that will inform your plan
-   - Do NOT skip this step - generic plans are useless
-
-2. PLANNING PHASE: Create a specific plan based on what you found
-   - Reference actual items/data you discovered (not placeholders)
-   - Be specific about what needs to be done for each item
-
-Format your FINAL output EXACTLY like this:
-**Objective:** [Specific objective based on what you found]
-
-**Steps:**
-1. [Concrete step referencing actual data discovered]
-2. [Next step]
-...
-
-EXAMPLE - If asked "research my newsletter recommendations":
-- BAD: "1. Read newsletter 2. Research recommendations 3. Compare to portfolio"
-- GOOD: First READ the newsletter, find "NVDA, ASML, LRCX mentioned", then plan:
-  "1. Research NVDA's AI thesis and valuation 2. Analyze ASML's moat in EUV 3. ..."
-
-Do your research now, then output the plan.`;
-
-			try {
-				// Send plan prompt without adding to timeline (internal message)
-				await sendMessage(planPrompt, { skipUserMessage: true });
-			} finally {
-				setIsPlanProcessing(false);
-			}
-		},
-		[sendMessage, addUserMessage]
-	);
-
-	// Parse plan from agent response
-	useEffect(() => {
-		if (!isPlanProcessing && pendingPromptRef.current && messages.length > 0) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage?.role === 'assistant' && lastMessage.content) {
-				const parsed = parsePlanFromText(lastMessage.content);
-				if (parsed && parsed.steps.length > 0) {
-					const plan = createPlan(
-						agent.getSessionId(),
-						pendingPromptRef.current,
-						parsed.objective,
-						parsed.steps
-					);
-					setCurrentPlan(plan);
-					pendingPromptRef.current = null;
-				}
-			}
-		}
-	}, [messages, isPlanProcessing, agent]);
-
-	// Handle plan approval
-	const handlePlanApprove = useCallback(() => {
-		if (!currentPlan) return;
-
-		const result = approvePlan(agent.getSessionId(), agent.name);
-		if (result) {
-			setCurrentPlan(null);
-			// Disable plan mode after approval - continue as normal chat
-			setPlanModeEnabled(false);
-
-			// Build step list with todo IDs so agent knows which to update
-			const stepsWithIds = result.plan.steps
-				.map((s, i) => `${i + 1}. ${s.description} (todo_id: ${result.todoIds[i]})`)
-				.join('\n');
-
-			// Execute the original prompt
-			const executePrompt = `The user has approved this plan. Now execute it step by step.
-
-Original request: "${result.plan.originalPrompt}"
-
-Plan steps (with todo IDs):
-${stepsWithIds}
-
-IMPORTANT: As you complete each step, call update_todo with the corresponding todo_id to mark it as completed. Do NOT create new todos - use the existing ones listed above.`;
-
-			sendMessage(executePrompt);
-		}
-	}, [currentPlan, agent, sendMessage]);
-
-	// Handle plan edit request
-	const handlePlanEdit = useCallback(
-		async (feedback: string) => {
-			if (!currentPlan) return;
-
-			setIsPlanProcessing(true);
-
-			const editPrompt = `Revise the plan based on this feedback:
-
-Original request: "${currentPlan.originalPrompt}"
-
-Current plan:
-${currentPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join('\n')}
-
-User feedback: "${feedback}"
-
-Provide a revised plan in the same format:
-**Objective:** [Your objective here]
-
-**Steps:**
-1. [First step]
-2. [Second step]
-...`;
-
-			pendingPromptRef.current = currentPlan.originalPrompt;
-
-			try {
-				await sendMessage(editPrompt);
-			} finally {
-				setIsPlanProcessing(false);
-			}
-		},
-		[currentPlan, sendMessage]
-	);
-
-	// Handle plan cancellation
-	const handlePlanCancel = useCallback(() => {
-		if (currentPlan) {
-			cancelPlan(agent.getSessionId());
-		}
-		setCurrentPlan(null);
-		setPlanModeEnabled(false);
-		pendingPromptRef.current = null;
-	}, [currentPlan, agent]);
 
 	// Handle input submission
 	const handleSubmit = useCallback(
@@ -307,7 +149,7 @@ Provide a revised plan in the same format:
 	);
 
 	// Determine current status for inline status bar
-	const getStatus = (): 'idle' | 'thinking' | 'tool' | 'responding' => {
+	const currentStatus = useMemo((): 'idle' | 'thinking' | 'tool' | 'responding' => {
 		if (!isLoading) return 'idle';
 
 		const runningTools = currentToolCalls.filter((tc) => tc.status === 'running');
@@ -316,9 +158,8 @@ Provide a revised plan in the same format:
 		if (streamingEntry) return 'responding';
 
 		return 'thinking';
-	};
+	}, [isLoading, currentToolCalls, streamingEntry]);
 
-	const currentStatus = getStatus();
 	const runningTool = currentToolCalls.find((tc) => tc.status === 'running');
 
 	// Filter out internal planning messages from timeline display
