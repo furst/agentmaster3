@@ -115,7 +115,12 @@ export type ObsidianConfig = z.infer<typeof ObsidianConfigSchema>;
 
 const CONFIG_FILENAME = 'config.json';
 
+// Caches for parsed configs
 let cachedProjectConfig: ProjectConfig | null = null;
+let cachedModelsConfig: ModelsConfig | null = null;
+let cachedNewsConfig: NewsConfig | null = null;
+let cachedFinanceConfig: (FinanceConfig & { lightModel: string; strongModel: string }) | null = null;
+let cachedObsidianConfig: ObsidianConfig | null = null;
 
 /**
  * Gets the project config file path
@@ -161,8 +166,12 @@ export function getProjectConfig(): ProjectConfig {
  * Gets news-specific configuration with defaults
  */
 export function getNewsConfig(): NewsConfig {
+	if (cachedNewsConfig) {
+		return cachedNewsConfig;
+	}
 	const projectConfig = getProjectConfig();
-	return NewsConfigSchema.parse(projectConfig.news ?? {});
+	cachedNewsConfig = NewsConfigSchema.parse(projectConfig.news ?? {});
+	return cachedNewsConfig;
 }
 
 /**
@@ -170,8 +179,12 @@ export function getNewsConfig(): NewsConfig {
  * Use this for consistent model access across all agents
  */
 export function getModelsConfig(): ModelsConfig {
+	if (cachedModelsConfig) {
+		return cachedModelsConfig;
+	}
 	const projectConfig = getProjectConfig();
-	return ModelsConfigSchema.parse(projectConfig.models ?? {});
+	cachedModelsConfig = ModelsConfigSchema.parse(projectConfig.models ?? {});
+	return cachedModelsConfig;
 }
 
 /**
@@ -179,12 +192,15 @@ export function getModelsConfig(): ModelsConfig {
  * Finance-specific model settings override shared models config
  */
 export function getFinanceConfig(): FinanceConfig & { lightModel: string; strongModel: string } {
+	if (cachedFinanceConfig) {
+		return cachedFinanceConfig;
+	}
 	const projectConfig = getProjectConfig();
 	const modelsConfig = getModelsConfig();
 	const financeConfig = FinanceConfigSchema.parse(projectConfig.finance ?? {});
 
 	// Use shared models config as fallback for finance-specific models
-	return {
+	cachedFinanceConfig = {
 		...financeConfig,
 		lightModel: financeConfig.lightModel ?? modelsConfig.light,
 		strongModel: financeConfig.strongModel ?? modelsConfig.strong,
@@ -192,6 +208,7 @@ export function getFinanceConfig(): FinanceConfig & { lightModel: string; strong
 			? financeConfig.reasoning
 			: modelsConfig.reasoning,
 	};
+	return cachedFinanceConfig;
 }
 
 /**
@@ -199,20 +216,28 @@ export function getFinanceConfig(): FinanceConfig & { lightModel: string; strong
  * Throws error if vaultPath is not configured
  */
 export function getObsidianConfig(): ObsidianConfig {
+	if (cachedObsidianConfig) {
+		return cachedObsidianConfig;
+	}
 	const projectConfig = getProjectConfig();
 	if (!projectConfig.obsidian?.vaultPath) {
 		throw new Error(
 			'Obsidian vault not configured. Add obsidian.vaultPath to ./config.json'
 		);
 	}
-	return ObsidianConfigSchema.parse(projectConfig.obsidian);
+	cachedObsidianConfig = ObsidianConfigSchema.parse(projectConfig.obsidian);
+	return cachedObsidianConfig;
 }
 
 /**
- * Clears the cached project config (useful for testing)
+ * Clears all cached configs (useful for testing or config reload)
  */
 export function clearProjectConfigCache(): void {
 	cachedProjectConfig = null;
+	cachedModelsConfig = null;
+	cachedNewsConfig = null;
+	cachedFinanceConfig = null;
+	cachedObsidianConfig = null;
 }
 
 export { getProjectConfigPath };
