@@ -16,7 +16,8 @@ source/
 ├── commands/           # Pastel command files (file-based routing)
 │   ├── index.tsx       # Default command (help)
 │   ├── ask.tsx         # General assistant agent
-│   └── news.tsx        # News aggregation agent
+│   ├── news.tsx        # News aggregation agent
+│   └── bg3.tsx         # Baldur's Gate 3 assistant
 ├── core/
 │   ├── config.ts       # User config (~/.config/agentmaster/)
 │   ├── project-config.ts # Project config (./config.json)
@@ -26,7 +27,8 @@ source/
 │   ├── timeline.ts     # Timeline types + useAgentTimeline hook
 │   ├── events.ts       # Event bus for sub-agent/todo communication
 │   ├── session-todo.ts # Session-scoped todo state management
-│   └── sub-agent.ts    # Sub-agent factory (hierarchical agents)
+│   ├── sub-agent.ts    # Sub-agent factory (hierarchical agents)
+│   └── memory.ts       # Per-agent persistent memory system
 ├── agents/             # Reusable sub-agent definitions
 │   ├── index.ts        # Exports all sub-agents
 │   ├── pdf-agent.ts    # PDF document analysis
@@ -55,6 +57,7 @@ source/
 │   ├── holdings.ts     # Parse and read stock holdings
 │   ├── research-notes.ts # Save/read research findings
 │   ├── session-todo.ts # Session-scoped todo list management
+│   ├── memory.ts       # Per-agent persistent memory
 │   └── index.ts        # Tool registry
 └── utils/
     ├── format.ts       # Text formatting helpers
@@ -310,6 +313,21 @@ Web search stub. Currently returns a placeholder - implement with Serper, Tavily
 import { webSearchTool } from '../tools/web-search.js';
 // Returns: { success: false, query, results: [], note, suggestedImplementation }
 ```
+
+### saveMemoryTool (save_memory)
+Save persistent per-agent memory. Memory is loaded into the system prompt at agent startup, so no read tool is needed.
+```typescript
+import { saveMemoryTool } from '../tools/memory.js';
+// Parameters: { agentName: string, content: string, append?: boolean }
+// Returns: { success, path, action, characterCount, message }
+```
+
+Memory files are stored at `./data/memory/{agentName}.md`. Each agent (ask, news, finance, bg3) has separate memory.
+
+**When to save memory:**
+- User preferences or context
+- Progress updates (for game agents like bg3)
+- Important decisions or facts to remember across sessions
 
 ## Configuration
 
@@ -1012,6 +1030,20 @@ node dist/cli.js news --prompt "get tech news"
 
 Uses `jinaReaderTool` to fetch news site homepages directly (real-time content).
 Configure sources in `./config.json` under the `news` key.
+
+### bg3
+Baldur's Gate 3 assistant for quests, builds, companions, and combat tactics.
+```bash
+node dist/cli.js bg3
+node dist/cli.js bg3 --prompt "How do I spec a Warlock?"
+```
+
+Features:
+- Concise, spoiler-aware answers
+- Persistent memory for character, party, and progress
+- Web research sub-agent for wiki lookups
+
+Memory is saved when you share character info (class, level, party changes, quest progress).
 
 ## Important Notes
 

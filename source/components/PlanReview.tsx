@@ -18,6 +18,72 @@ export interface PlanReviewProps {
 type ReviewMode = 'review' | 'edit';
 
 // ============================================================================
+// Inline Markdown Parser
+// ============================================================================
+
+/**
+ * Parse inline markdown formatting (**bold**, *italic*, `code`)
+ */
+function parseInlineMarkdown(text: string): React.ReactNode[] {
+	const parts: React.ReactNode[] = [];
+	let remaining = text;
+	let keyIndex = 0;
+
+	while (remaining.length > 0) {
+		// Bold **text**
+		const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+		if (boldMatch && boldMatch.index !== undefined) {
+			if (boldMatch.index > 0) {
+				parts.push(<Text key={`t-${keyIndex++}`}>{remaining.slice(0, boldMatch.index)}</Text>);
+			}
+			parts.push(
+				<Text key={`b-${keyIndex++}`} bold>
+					{boldMatch[1]}
+				</Text>
+			);
+			remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
+			continue;
+		}
+
+		// Inline code `text`
+		const codeMatch = remaining.match(/`([^`]+)`/);
+		if (codeMatch && codeMatch.index !== undefined) {
+			if (codeMatch.index > 0) {
+				parts.push(<Text key={`t-${keyIndex++}`}>{remaining.slice(0, codeMatch.index)}</Text>);
+			}
+			parts.push(
+				<Text key={`c-${keyIndex++}`} color="cyan">
+					{codeMatch[1]}
+				</Text>
+			);
+			remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
+			continue;
+		}
+
+		// Italic *text* (but not at word boundaries that look like bullets)
+		const italicMatch = remaining.match(/(?<!\S)\*([^*\n]+)\*(?!\S)/);
+		if (italicMatch && italicMatch.index !== undefined) {
+			if (italicMatch.index > 0) {
+				parts.push(<Text key={`t-${keyIndex++}`}>{remaining.slice(0, italicMatch.index)}</Text>);
+			}
+			parts.push(
+				<Text key={`i-${keyIndex++}`} italic>
+					{italicMatch[1]}
+				</Text>
+			);
+			remaining = remaining.slice(italicMatch.index + italicMatch[0].length);
+			continue;
+		}
+
+		// No more matches
+		parts.push(<Text key={`t-${keyIndex++}`}>{remaining}</Text>);
+		break;
+	}
+
+	return parts;
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -88,82 +154,76 @@ export function PlanReview({
 	);
 
 	return (
-		<Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} marginY={1}>
-			{/* Header */}
-			<Box marginBottom={1}>
-				<Text color="cyan" bold>
-					📋 Plan Review
-				</Text>
+		<Box flexDirection="column" marginTop={1}>
+			{/* Header - markdown style */}
+			<Box>
+				<Text color="blue">● </Text>
+				<Text bold>Plan Review</Text>
 				{isProcessing && (
-					<Text color="yellow" dimColor>
-						{' '}
-						(processing...)
+					<Text color="gray" dimColor>
+						{' '}(processing...)
 					</Text>
 				)}
 			</Box>
 
-			{/* Objective */}
-			<Box marginBottom={1}>
-				<Text color="white" bold>
-					Objective:{' '}
-				</Text>
-				<Text>{plan.objective}</Text>
-			</Box>
+			{/* Content - indented like markdown */}
+			<Box flexDirection="column" marginLeft={2}>
+				{/* Objective */}
+				<Box marginTop={1}>
+					<Text bold>Objective: </Text>
+					<Text wrap="wrap">{parseInlineMarkdown(plan.objective)}</Text>
+				</Box>
 
-			{/* Steps */}
-			<Box flexDirection="column" marginBottom={1}>
-				<Text color="white" bold>
-					Steps:
-				</Text>
-				{plan.steps.map((step, index) => (
-					<Box key={step.id}>
-						<Text color="gray">
-							{index === plan.steps.length - 1 ? '└─ ' : '├─ '}
-						</Text>
-						<Text color="cyan">{index + 1}. </Text>
-						<Text>{step.description}</Text>
-					</Box>
-				))}
-			</Box>
-
-			{/* Review Mode - Options */}
-			{mode === 'review' && !isProcessing && (
+				{/* Steps */}
 				<Box flexDirection="column" marginTop={1}>
-					<Text color="gray" dimColor>
-						Select an option (↑↓ to navigate, Enter to select):
-					</Text>
+					<Text bold>Steps:</Text>
+					{plan.steps.map((step, index) => (
+						<Box key={step.id} marginLeft={1}>
+							<Text color="gray">{index + 1}. </Text>
+							<Text wrap="wrap">{parseInlineMarkdown(step.description)}</Text>
+						</Box>
+					))}
+				</Box>
+
+				{/* Review Mode - Options */}
+				{mode === 'review' && !isProcessing && (
 					<Box flexDirection="column" marginTop={1}>
-						{options.map((option, index) => (
-							<Box key={option.key}>
-								<Text color={selectedOption === index ? option.color : 'gray'}>
-									{selectedOption === index ? '▸ ' : '  '}
-								</Text>
-								<Text
-									color={selectedOption === index ? option.color : 'white'}
-									bold={selectedOption === index}
-								>
-									[{option.key.charAt(0).toUpperCase()}] {option.label}
-								</Text>
-							</Box>
-						))}
+						<Text color="gray" dimColor>
+							↑↓ navigate, Enter select, or press A/E/C:
+						</Text>
+						<Box marginTop={1}>
+							{options.map((option, index) => (
+								<Box key={option.key} marginRight={2}>
+									<Text color={selectedOption === index ? option.color : 'gray'}>
+										{selectedOption === index ? '▸' : ' '}
+									</Text>
+									<Text
+										color={selectedOption === index ? option.color : 'white'}
+										bold={selectedOption === index}
+									>
+										[{option.key.charAt(0).toUpperCase()}] {option.label}
+									</Text>
+								</Box>
+							))}
+						</Box>
 					</Box>
-				</Box>
-			)}
+				)}
 
-			{/* Edit Mode - Text Input */}
-			{mode === 'edit' && (
-				<Box flexDirection="column" marginTop={1}>
-					<Text color="yellow">Describe your changes (Esc to cancel):</Text>
-					<Box marginTop={1}>
-						<Text color="yellow">{'> '}</Text>
-						<TextInput
-							key={editKey}
-							onSubmit={handleEditSubmit}
-							placeholder="e.g., Add a step for testing, combine steps 2 and 3..."
-						/>
+				{/* Edit Mode - Text Input */}
+				{mode === 'edit' && (
+					<Box flexDirection="column" marginTop={1}>
+						<Text color="yellow">Describe your changes (Esc to cancel):</Text>
+						<Box marginTop={1}>
+							<Text color="yellow">{'> '}</Text>
+							<TextInput
+								key={editKey}
+								onSubmit={handleEditSubmit}
+								placeholder="e.g., Add a step for testing, be more specific about X..."
+							/>
+						</Box>
 					</Box>
-				</Box>
-			)}
+				)}
+			</Box>
 		</Box>
 	);
 }
@@ -177,7 +237,7 @@ export function PlanModeIndicator({ enabled }: { enabled: boolean }) {
 	return (
 		<>
 			<Text color="gray"> | </Text>
-			<Text color="cyan">📋 Plan Mode</Text>
+			<Text color="cyan">Plan Mode</Text>
 		</>
 	);
 }

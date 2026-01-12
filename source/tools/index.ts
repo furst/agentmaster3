@@ -13,6 +13,7 @@ export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultT
 export { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
 export { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
 export { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
+export { saveMemoryTool } from './memory.js';
 
 import { readFileTool } from './read-file.js';
 import { webSearchTool } from './web-search.js';
@@ -25,6 +26,7 @@ import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultT
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
 import { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
+import { saveMemoryTool } from './memory.js';
 import { createToolsRecord } from '../core/tools.js';
 
 /**
@@ -54,6 +56,7 @@ export const allTools = [
 	updateTodoTool,
 	getTodosTool,
 	clearTodosTool,
+	saveMemoryTool,
 ];
 
 /**
@@ -71,6 +74,7 @@ export const toolCategories = {
 	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
 	research: [saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
 	productivity: [createTodosTool, updateTodoTool, getTodosTool, clearTodosTool],
+	memory: [saveMemoryTool],
 } as const;
 
 /**

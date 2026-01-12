@@ -5,6 +5,10 @@ import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getNewsConfig, getModelsConfig } from "../core/project-config.js";
 import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
+import { buildMemoryPromptSection } from "../core/memory.js";
+
+// Tools
+import { saveMemoryTool } from "../tools/memory.js";
 
 // Sub-agents
 import { createWebResearchAgent } from "../agents/web-research-agent.js";
@@ -20,8 +24,11 @@ type Props = {
   options: z.infer<typeof options>;
 };
 
+const AGENT_NAME = "news";
+
 function buildSystemPrompt(): string {
   const config = getNewsConfig();
+  const memorySection = buildMemoryPromptSection(AGENT_NAME);
 
   const configuredUrls = config.sites.map(site =>
     site.startsWith('http') ? site : `https://${site}`
@@ -50,7 +57,16 @@ function buildSystemPrompt(): string {
       },
     ],
 
-    additionalInstructions: `## News Sources
+    directTools: [
+      {
+        name: "save_memory",
+        description: "Save user's news preferences and interests",
+      },
+    ],
+
+    additionalInstructions: `${memorySection}
+
+## News Sources
 
 ${sitesNote}
 
@@ -83,7 +99,14 @@ Present news using markdown formatting:
 
 **Another Story** - Brief summary [source]
 
-For topic-specific requests, use descriptive headers like "## Tech News" or "## Sports Headlines".`,
+For topic-specific requests, use descriptive headers like "## Tech News" or "## Sports Headlines".
+
+## Memory
+
+Save to memory (agentName="${AGENT_NAME}") when user shares:
+- Preferred news topics or interests
+- Preferred sources or sites
+- Reading preferences (summary length, format)`,
   });
 }
 
@@ -98,7 +121,7 @@ export default function News({ options }: Props) {
       name: "news",
       systemPrompt: buildSystemPrompt(),
       model: modelsConfig.light,
-      tools: createToolsRecord([webResearchAgent]),
+      tools: createToolsRecord([saveMemoryTool, webResearchAgent]),
       maxIterations: 10,
     });
   }, [modelsConfig.light, webResearchAgent]);

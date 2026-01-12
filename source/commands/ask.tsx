@@ -5,6 +5,10 @@ import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getModelsConfig } from "../core/project-config.js";
 import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
+import { buildMemoryPromptSection } from "../core/memory.js";
+
+// Tools
+import { saveMemoryTool } from "../tools/memory.js";
 
 // Sub-agents
 import { createVaultAgent } from "../agents/vault-agent.js";
@@ -21,7 +25,11 @@ type Props = {
   options: z.infer<typeof options>;
 };
 
+const AGENT_NAME = "ask";
+
 function buildSystemPrompt(): string {
+  const memorySection = buildMemoryPromptSection(AGENT_NAME);
+
   return buildOrchestratorPrompt({
     role: `You are a helpful, friendly, and knowledgeable assistant. You help with questions, explanations, writing, brainstorming, and problem-solving.`,
 
@@ -48,7 +56,16 @@ function buildSystemPrompt(): string {
       },
     ],
 
-    additionalInstructions: `## General Guidelines
+    directTools: [
+      {
+        name: "save_memory",
+        description: "Save important context about user preferences or ongoing work",
+      },
+    ],
+
+    additionalInstructions: `${memorySection}
+
+## General Guidelines
 
 - Be clear and concise
 - When fetching content from the web, offer to save useful items to the vault
@@ -61,7 +78,14 @@ function buildSystemPrompt(): string {
 When saving to vault:
 - Save to "Bucket" folder (e.g., "Bucket/Recipe Name.md")
 - Use content title as filename
-- Format as clean markdown`,
+- Format as clean markdown
+
+## Memory
+
+Save to memory (agentName="${AGENT_NAME}") when user shares:
+- Preferences about how they like responses
+- Ongoing projects or context
+- Personal details relevant to future conversations`,
   });
 }
 
@@ -78,6 +102,7 @@ export default function Ask({ options }: Props) {
       systemPrompt: buildSystemPrompt(),
       model: modelsConfig.light,
       tools: createToolsRecord([
+        saveMemoryTool,
         vaultAgent,
         webResearchAgent,
       ]),

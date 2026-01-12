@@ -72,6 +72,7 @@ export function AgentShell({
 		error,
 		stats,
 		sendMessage,
+		addUserMessage,
 		cancel,
 		reset,
 	} = useAgentTimeline(agent);
@@ -140,33 +141,48 @@ export function AgentShell({
 			setIsPlanProcessing(true);
 			pendingPromptRef.current = prompt;
 
-			// Ask agent to create a plan
-			const planPrompt = `You are in PLANNING MODE. Do NOT execute the task yet. Instead, create a plan.
+			// Add user's actual prompt to timeline first
+			addUserMessage(prompt);
+
+			// Ask agent to create a plan - with research phase first
+			const planPrompt = `You are in PLANNING MODE. Your job is to create an informed, concrete plan.
 
 User request: "${prompt}"
 
-Create a structured plan with:
-1. A clear objective (one sentence)
-2. Numbered steps to achieve it (be specific)
+IMPORTANT: Do research FIRST, then plan.
 
-Format your response EXACTLY like this:
-**Objective:** [Your objective here]
+1. RESEARCH PHASE: Use your tools to gather the information needed to understand the task
+   - Read relevant files, fetch pages, check current state
+   - Get concrete details that will inform your plan
+   - Do NOT skip this step - generic plans are useless
+
+2. PLANNING PHASE: Create a specific plan based on what you found
+   - Reference actual items/data you discovered (not placeholders)
+   - Be specific about what needs to be done for each item
+
+Format your FINAL output EXACTLY like this:
+**Objective:** [Specific objective based on what you found]
 
 **Steps:**
-1. [First step]
-2. [Second step]
-3. [Third step]
+1. [Concrete step referencing actual data discovered]
+2. [Next step]
 ...
 
-IMPORTANT: Only output the plan. Do not start executing it.`;
+EXAMPLE - If asked "research my newsletter recommendations":
+- BAD: "1. Read newsletter 2. Research recommendations 3. Compare to portfolio"
+- GOOD: First READ the newsletter, find "NVDA, ASML, LRCX mentioned", then plan:
+  "1. Research NVDA's AI thesis and valuation 2. Analyze ASML's moat in EUV 3. ..."
+
+Do your research now, then output the plan.`;
 
 			try {
-				await sendMessage(planPrompt);
+				// Send plan prompt without adding to timeline (internal message)
+				await sendMessage(planPrompt, { skipUserMessage: true });
 			} finally {
 				setIsPlanProcessing(false);
 			}
 		},
-		[sendMessage]
+		[sendMessage, addUserMessage]
 	);
 
 	// Parse plan from agent response
@@ -352,7 +368,7 @@ Provide a revised plan in the same format:
 			)}
 
 			{/* Timeline view - shows messages, tool calls, and sub-agents interleaved */}
-			<TimelineView entries={displayTimeline} streamingEntry={displayStreamingEntry} isLoading={isLoading} />
+			<TimelineView entries={displayTimeline} streamingEntry={displayStreamingEntry} isLoading={isLoading} currentToolCalls={currentToolCalls} />
 
 			{/* Plan review section */}
 			{currentPlan && currentPlan.status === 'draft' && (
@@ -406,7 +422,7 @@ Provide a revised plan in the same format:
 							isLoading || isPlanProcessing
 								? 'Processing...'
 								: planModeEnabled
-									? 'Describe your task (will create plan first)...'
+									? 'Describe your task (will research, then plan)...'
 									: placeholder
 						}
 						onSubmit={handleSubmit}

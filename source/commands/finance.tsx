@@ -5,6 +5,7 @@ import { AgentShell } from "../components/AgentShell.js";
 import { createToolsRecord } from "../core/tools.js";
 import { getFinanceConfig } from "../core/project-config.js";
 import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
+import { buildMemoryPromptSection } from "../core/memory.js";
 
 // Sub-agents (delegated tasks)
 import { createPdfAgent } from "../agents/pdf-agent.js";
@@ -14,6 +15,7 @@ import { createWebResearchAgent } from "../agents/web-research-agent.js";
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
 import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from "../tools/research-notes.js";
+import { saveMemoryTool } from "../tools/memory.js";
 
 export const options = z.object({
   prompt: z.string().optional().describe("Initial prompt or question"),
@@ -23,7 +25,10 @@ type Props = {
   options: z.infer<typeof options>;
 };
 
+const AGENT_NAME = "finance";
+
 function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string {
+  const memorySection = buildMemoryPromptSection(AGENT_NAME);
   const socialDomains = config.researchSources.social.join(", ");
   const newsDomains = config.researchSources.news.join(", ");
   const redditSubs = config.researchSources.redditSubs.join(", ");
@@ -64,9 +69,12 @@ function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string 
       { name: "read_mindset", description: "Read user's investment philosophy" },
       { name: "save_mindset", description: "Update investment philosophy" },
       { name: "save_research_note", description: "Save research findings" },
+      { name: "save_memory", description: "Save general context and preferences" },
     ],
 
-    additionalInstructions: `## Finance-Specific Guidelines
+    additionalInstructions: `${memorySection}
+
+## Finance-Specific Guidelines
 
 - **Read mindset first** when giving personalized advice
 - Present **bull and bear cases** for investments
@@ -88,7 +96,15 @@ function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string 
 When working with newsletters or PDFs:
 - Newsletter directory: ${newsletterDir}
 - ALWAYS pass \`directory: "${newsletterDir}"\` to pdf_agent for newsletter operations
-- When summarizing specific files, pass \`filePath\` with the full path`,
+- When summarizing specific files, pass \`filePath\` with the full path
+
+## Memory
+
+Save to memory (agentName="${AGENT_NAME}") for general context:
+- Watchlist stocks or sectors of interest
+- Analysis preferences (depth, focus areas)
+- Current market thesis or outlook
+Note: Use save_mindset for core investment philosophy; use save_memory for transient context.`,
   });
 }
 
@@ -119,6 +135,7 @@ export default function Finance({ options }: Props) {
           saveResearchNoteTool,
           readResearchNotesTool,
           listResearchNotesTool,
+          saveMemoryTool,
         ]),
         maxIterations: 15,
         reasoning: config.reasoning.enabled

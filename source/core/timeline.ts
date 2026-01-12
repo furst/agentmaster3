@@ -152,26 +152,26 @@ export function useAgentTimeline(agent: Agent) {
 		}
 	}, [currentToolCalls, addTextEntry]);
 
-	// Update tool call statuses in timeline
-	useEffect(() => {
-		setTimeline(prev => {
-			let changed = false;
-			const updated = prev.map(entry => {
-				if (entry.type !== 'tool-call' || !entry.toolCall) return entry;
+	// Enrich timeline with current tool call states (computed on every render)
+	// This ensures tool call status changes are reflected immediately without useEffect delay
+	const enrichedTimeline = useMemo(() => {
+		return timeline.map(entry => {
+			if (entry.type !== 'tool-call' || !entry.toolCall) return entry;
 
-				const updatedToolCall = currentToolCalls.find(
-					tc => tc.toolCallId === entry.toolCall!.toolCallId
-				);
+			const currentToolCall = currentToolCalls.find(
+				tc => tc.toolCallId === entry.toolCall!.toolCallId
+			);
 
-				if (updatedToolCall && updatedToolCall.status !== entry.toolCall.status) {
-					changed = true;
-					return { ...entry, toolCall: updatedToolCall };
-				}
-				return entry;
-			});
-			return changed ? updated : prev;
+			// If we have a more recent version from currentToolCalls, use it
+			if (currentToolCall && (
+				currentToolCall.status !== entry.toolCall.status ||
+				currentToolCall.endTime !== entry.toolCall.endTime
+			)) {
+				return { ...entry, toolCall: currentToolCall };
+			}
+			return entry;
 		});
-	}, [currentToolCalls]);
+	}, [timeline, currentToolCalls]);
 
 	// Detect when loading finishes and finalize remaining text + force-complete tool calls
 	useEffect(() => {
@@ -352,11 +352,10 @@ export function useAgentTimeline(agent: Agent) {
 	// Include streamingContent in deps to trigger re-computation when it changes
 	}, [isLoading, streamingContent]);
 
-	// Enhanced sendMessage that adds user message to timeline
-	const sendMessage = useCallback(async (content: string) => {
+	// Add user message to timeline without sending to agent
+	const addUserMessage = useCallback((content: string) => {
 		if (!content.trim()) return;
 
-		// Add user message to timeline
 		const userEntry: TimelineEntry = {
 			id: generateTimelineId(),
 			type: 'user-message',
@@ -364,6 +363,22 @@ export function useAgentTimeline(agent: Agent) {
 			content,
 		};
 		setTimeline(prev => [...prev, userEntry]);
+	}, []);
+
+	// Enhanced sendMessage that adds user message to timeline
+	const sendMessage = useCallback(async (content: string, options?: { skipUserMessage?: boolean }) => {
+		if (!content.trim()) return;
+
+		// Add user message to timeline (unless skipped for internal messages)
+		if (!options?.skipUserMessage) {
+			const userEntry: TimelineEntry = {
+				id: generateTimelineId(),
+				type: 'user-message',
+				timestamp: Date.now(),
+				content,
+			};
+			setTimeline(prev => [...prev, userEntry]);
+		}
 
 		// Reset accumulator state for new message
 		accumulatedTextRef.current = '';
@@ -386,8 +401,8 @@ export function useAgentTimeline(agent: Agent) {
 	}, [agentReset]);
 
 	return {
-		// Timeline state
-		timeline,
+		// Timeline state (enriched with latest tool call status)
+		timeline: enrichedTimeline,
 		streamingEntry,
 
 		// Original state (for backwards compatibility)
@@ -399,6 +414,7 @@ export function useAgentTimeline(agent: Agent) {
 
 		// Actions
 		sendMessage,
+		addUserMessage,
 		cancel,
 		reset,
 	};

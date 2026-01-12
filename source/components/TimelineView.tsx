@@ -72,21 +72,44 @@ interface ToolCallEntryProps {
 	entry: TimelineEntry;
 	/** Force status to complete (used when loading is done but status wasn't updated) */
 	forceComplete?: boolean;
+	/** Current tool calls for real-time status lookup */
+	currentToolCalls?: Array<{
+		toolCallId: string;
+		status: string;
+		endTime?: number;
+		result?: unknown;
+		error?: string;
+	}>;
 }
 
 /**
  * Renders a tool call entry with its result
  */
-const ToolCallEntry = memo(function ToolCallEntry({ entry, forceComplete = false }: ToolCallEntryProps) {
+const ToolCallEntry = memo(function ToolCallEntry({
+	entry,
+	forceComplete = false,
+	currentToolCalls = [],
+}: ToolCallEntryProps) {
 	const tc = entry.toolCall;
 	if (!tc) return null;
 
-	// If forceComplete is true and status is 'running', treat as 'complete'
-	const effectiveStatus = (forceComplete && tc.status === 'running') ? 'complete' : tc.status;
-	const duration = tc.endTime ? tc.endTime - tc.startTime : undefined;
+	// Look up current status from currentToolCalls for real-time updates
+	const currentTc = currentToolCalls.find(ctc => ctc.toolCallId === tc.toolCallId);
+	const latestStatus = currentTc?.status ?? tc.status;
+	const latestEndTime = currentTc?.endTime ?? tc.endTime;
+	const latestResult = currentTc?.result ?? tc.result;
+	const latestError = currentTc?.error ?? tc.error;
 
-	const showResult = effectiveStatus === 'complete' && tc.result !== undefined;
-	const showError = (effectiveStatus === 'error' || effectiveStatus === 'denied') && tc.error;
+	// Use endTime as source of truth for completion
+	const duration = latestEndTime ? latestEndTime - tc.startTime : undefined;
+	const effectiveStatus: 'pending' | 'running' | 'complete' | 'error' | 'denied' = latestEndTime
+		? (latestStatus === 'error' ? 'error' : latestStatus === 'denied' ? 'denied' : 'complete')
+		: (forceComplete && latestStatus === 'running')
+			? 'complete'
+			: (latestStatus as 'pending' | 'running' | 'complete' | 'error' | 'denied');
+
+	const showResult = effectiveStatus === 'complete' && latestResult !== undefined;
+	const showError = (effectiveStatus === 'error' || effectiveStatus === 'denied') && latestError;
 
 	return (
 		<Box flexDirection="column" marginTop={1}>
@@ -96,35 +119,26 @@ const ToolCallEntry = memo(function ToolCallEntry({ entry, forceComplete = false
 					name={tc.name}
 					status={effectiveStatus}
 					input={tc.args as Record<string, unknown>}
-					output={tc.result}
-					error={tc.error}
+					output={latestResult}
+					error={latestError}
 					duration={duration}
 				/>
 			</Box>
 			{showResult && (
 				<Box marginLeft={2}>
 					<Text color="gray">{'└  '}</Text>
-					<Text color="gray">{formatToolResult(tc.name, tc.result)}</Text>
+					<Text color="gray">{formatToolResult(tc.name, latestResult)}</Text>
 				</Box>
 			)}
 			{showError && (
 				<Box marginLeft={2}>
 					<Text color="gray">{'└  '}</Text>
-					<Text color="red">{truncate(tc.error!, 60)}</Text>
+					<Text color="red">{truncate(String(latestError), 60)}</Text>
 				</Box>
 			)}
 		</Box>
 	);
-}, (prevProps, nextProps) => {
-	// Custom comparison - re-render if tool call status, result, or forceComplete changed
-	if (prevProps.forceComplete !== nextProps.forceComplete) return false;
-	const prev = prevProps.entry.toolCall;
-	const next = nextProps.entry.toolCall;
-	if (!prev || !next) return prev === next;
-	return prev.status === next.status &&
-		   prev.result === next.result &&
-		   prev.error === next.error;
-});
+}); // Remove memo comparison to ensure re-renders on currentToolCalls change
 
 /**
  * Formats tool result for display in timeline
@@ -294,8 +308,12 @@ const SubAgentEntry = memo(function SubAgentEntry({ entry, forceComplete = false
 						const tcDuration = tc.endTime ? tc.endTime - tc.startTime : undefined;
 						const tcResult = formatSubAgentToolResult(tc.toolName, tc.result);
 
-						// Force complete if parent is force-completed
-						const tcEffectiveStatus = (forceComplete && tc.status === 'running') ? 'complete' : tc.status;
+						// Use endTime as source of truth for completion
+						const tcEffectiveStatus = tc.endTime
+							? (tc.status === 'error' ? 'error' : 'complete')
+							: (forceComplete && tc.status === 'running')
+								? 'complete'
+								: tc.status;
 
 						const ToolStatusIcon = () => {
 							if (tcEffectiveStatus === 'running') {
@@ -377,13 +395,26 @@ export interface TimelineViewProps {
 	streamingEntry: TimelineEntry | null;
 	/** Whether the agent is currently loading - used to force-complete tool calls when done */
 	isLoading?: boolean;
+	/** Current tool calls for real-time status lookup */
+	currentToolCalls?: Array<{
+		toolCallId: string;
+		status: string;
+		endTime?: number;
+		result?: unknown;
+		error?: string;
+	}>;
 }
 
 /**
  * Renders a chronological timeline of the conversation
  * with text and tool calls interleaved in order
  */
-export const TimelineView = memo(function TimelineView({ entries, streamingEntry, isLoading = true }: TimelineViewProps) {
+export const TimelineView = memo(function TimelineView({
+	entries,
+	streamingEntry,
+	isLoading = true,
+	currentToolCalls = [],
+}: TimelineViewProps) {
 	if (entries.length === 0 && !streamingEntry) {
 		return null;
 	}
@@ -391,10 +422,20 @@ export const TimelineView = memo(function TimelineView({ entries, streamingEntry
 	return (
 		<Box flexDirection="column">
 			{entries.map((entry) => (
-				<TimelineEntryComponent key={entry.id} entry={entry} forceComplete={!isLoading} />
+				<TimelineEntryComponent
+					key={entry.id}
+					entry={entry}
+					forceComplete={!isLoading}
+					currentToolCalls={currentToolCalls}
+				/>
 			))}
 			{streamingEntry && (
-				<TimelineEntryComponent key={streamingEntry.id} entry={streamingEntry} forceComplete={false} />
+				<TimelineEntryComponent
+					key={streamingEntry.id}
+					entry={streamingEntry}
+					forceComplete={false}
+					currentToolCalls={currentToolCalls}
+				/>
 			)}
 		</Box>
 	);
@@ -404,6 +445,14 @@ interface TimelineEntryComponentProps {
 	entry: TimelineEntry;
 	/** Force tool calls to show as complete (used when loading is done) */
 	forceComplete?: boolean;
+	/** Current tool calls for real-time status lookup */
+	currentToolCalls?: Array<{
+		toolCallId: string;
+		status: string;
+		endTime?: number;
+		result?: unknown;
+		error?: string;
+	}>;
 }
 
 /**
@@ -418,7 +467,11 @@ function isSubAgentToolCall(entry: TimelineEntry): boolean {
 /**
  * Renders a single timeline entry based on its type
  */
-const TimelineEntryComponent = memo(function TimelineEntryComponent({ entry, forceComplete = false }: TimelineEntryComponentProps) {
+const TimelineEntryComponent = memo(function TimelineEntryComponent({
+	entry,
+	forceComplete = false,
+	currentToolCalls = [],
+}: TimelineEntryComponentProps) {
 	switch (entry.type) {
 		case 'user-message':
 			return <UserMessageEntry entry={entry} />;
@@ -428,7 +481,7 @@ const TimelineEntryComponent = memo(function TimelineEntryComponent({ entry, for
 		case 'tool-call':
 			// Skip sub-agent tool calls - they're shown as sub-agent entries
 			if (isSubAgentToolCall(entry)) return null;
-			return <ToolCallEntry entry={entry} forceComplete={forceComplete} />;
+			return <ToolCallEntry entry={entry} forceComplete={forceComplete} currentToolCalls={currentToolCalls} />;
 		case 'sub-agent':
 			return <SubAgentEntry entry={entry} forceComplete={forceComplete} />;
 		default:
