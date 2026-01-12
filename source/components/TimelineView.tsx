@@ -3,8 +3,7 @@ import { Box, Text } from 'ink';
 import { Spinner as InkSpinner } from '@inkjs/ui';
 import { type TimelineEntry } from '../core/timeline.js';
 import { ToolCall } from './ToolCall.js';
-import { ContentCard } from './ContentCard.js';
-import { parseContentWithCards, hasCardMarkers } from '../utils/content-parser.js';
+import { Markdown } from './Markdown.js';
 import { truncate, formatDuration } from '../utils/format.js';
 import { parseModelDisplay } from '../utils/model.js';
 
@@ -33,56 +32,34 @@ interface TextSegmentEntryProps {
 }
 
 /**
- * Renders an assistant text segment, with ContentCard support
+ * Renders an assistant text segment with markdown formatting
  */
 const TextSegmentEntry = memo(function TextSegmentEntry({ entry }: TextSegmentEntryProps) {
 	const content = entry.content ?? '';
 	const isStreaming = entry.isStreaming;
 
-	// Check for ContentCard markers (only on finalized content)
-	if (!isStreaming && hasCardMarkers(content)) {
-		const segments = parseContentWithCards(content);
-
+	// While streaming, show raw text (faster)
+	if (isStreaming) {
 		return (
-			<Box flexDirection="column" marginTop={1}>
-				<Box>
-					<Text color="blue">{'● '}</Text>
-				</Box>
-				{segments.map((segment, index) => {
-					if (segment.type === 'card' && segment.cardType) {
-						return (
-							<Box key={`card-${index}`} marginLeft={2}>
-								<ContentCard
-									type={segment.cardType}
-									title={segment.title}
-									content={segment.content}
-								/>
-							</Box>
-						);
-					}
-					// Regular text
-					return (
-						<Box key={`text-${index}`} marginLeft={2}>
-							<Text wrap="wrap">{segment.content}</Text>
-						</Box>
-					);
-				})}
+			<Box marginTop={1}>
+				<Text color="cyan">{'● '}</Text>
+				<Text wrap="wrap">
+					{content}
+					<Text color="gray">{'▌'}</Text>
+				</Text>
 			</Box>
 		);
 	}
 
-	// Regular text segment - inline with bullet
+	// For finalized content, render with markdown formatting
 	return (
-		<Box marginTop={1}>
-			{isStreaming ? (
-				<Text color="cyan">{'● '}</Text>
-			) : (
+		<Box flexDirection="column" marginTop={1}>
+			<Box>
 				<Text color="blue">{'● '}</Text>
-			)}
-			<Text wrap="wrap">
-				{content}
-				{isStreaming && <Text color="gray">{'▌'}</Text>}
-			</Text>
+			</Box>
+			<Box marginLeft={2}>
+				<Markdown content={content} />
+			</Box>
 		</Box>
 	);
 }, (prevProps, nextProps) => {

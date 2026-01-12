@@ -11,8 +11,8 @@ export type { ErrorDisplayProps, ApiErrorDisplayProps } from './Error.js';
 export { Message, MessageList, SystemMessage } from './Message.js';
 export type { MessageProps, MessageListProps, SystemMessageProps } from './Message.js';
 
-export { ContentCard, CardDivider } from './ContentCard.js';
-export type { ContentCardProps, ContentCardType } from './ContentCard.js';
+export { Markdown } from './Markdown.js';
+export type { MarkdownProps } from './Markdown.js';
 
 export { ToolCall, ToolCallList } from './ToolCall.js';
 export type { ToolCallProps, ToolCallListProps } from './ToolCall.js';

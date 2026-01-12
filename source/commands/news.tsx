@@ -75,15 +75,15 @@ ${interestsNote}
 
 ## Output Format
 
-Present news in a ContentCard:
+Present news using markdown formatting:
 
-:::news "Today's Headlines"
+## Today's Headlines
+
 **Story Title** - Brief one-line summary [source]
 
 **Another Story** - Brief summary [source]
-:::
 
-For topic-specific requests, use descriptive titles like "Tech News" or "Sports Headlines".`,
+For topic-specific requests, use descriptive headers like "## Tech News" or "## Sports Headlines".`,
   });
 }
 

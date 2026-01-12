@@ -71,17 +71,17 @@ function buildSystemPrompt(config: ReturnType<typeof getFinanceConfig>): string 
 - **Read mindset first** when giving personalized advice
 - Present **bull and bear cases** for investments
 - **Flag risks clearly** - never give definitive buy/sell recommendations
-- Use **ContentCard** markers for structured output:
+- Use markdown formatting for structured output:
 
-:::finance "Company Analysis: TICKER"
-Price: $XXX | Market Cap: $XXB
+## Company Analysis: TICKER
 
-## Bull Case
+**Price:** $XXX | **Market Cap:** $XXB
+
+### Bull Case
 - Key opportunity
 
-## Bear Case
+### Bear Case
 - Key risk
-:::
 
 ## PDF/Newsletter Analysis
 

@@ -54,24 +54,7 @@ function buildSystemPrompt(): string {
 - When fetching content from the web, offer to save useful items to the vault
 - When performing vault operations, be brief - don't comment on note content
 - Be honest about limitations or uncertainty
-
-## Content Formatting
-
-Use ContentCard markers for structured content:
-
-:::recipe "Recipe Name"
-Prep Time: X minutes
-
-## Ingredients
-- Item 1
-- Item 2
-
-## Instructions
-1. Step one
-2. Step two
-:::
-
-Available types: \`recipe\`, \`summary\`, \`list\`, \`info\`, \`warning\`, \`success\`
+- Use markdown formatting for structured content (headers, lists, bold, etc.)
 
 ## Vault Notes
 
