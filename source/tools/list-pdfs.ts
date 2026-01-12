@@ -2,6 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { resolve, isAbsolute, extname, join } from 'node:path';
 import { z } from 'zod';
 import { defineTool } from '../core/tools.js';
+import { toolSuccess, handleFileError } from '../core/tool-errors.js';
 
 /**
  * List PDFs tool - lists all PDF files in a directory
@@ -52,36 +53,13 @@ export const listPdfsTool = defineTool({
 					new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
 			);
 
-			return {
-				success: true,
+			return toolSuccess({
 				directory: resolvedDir,
 				count: pdfFiles.length,
 				files: pdfFiles.slice(0, limit),
-			};
+			});
 		} catch (error) {
-			const err = error as NodeJS.ErrnoException;
-
-			if (err.code === 'ENOENT') {
-				return {
-					success: false,
-					error: `Directory not found: ${directory}`,
-					directory,
-				};
-			}
-
-			if (err.code === 'EACCES') {
-				return {
-					success: false,
-					error: `Permission denied: ${directory}`,
-					directory,
-				};
-			}
-
-			return {
-				success: false,
-				error: `Failed to list PDFs: ${err.message}`,
-				directory,
-			};
+			return handleFileError(error, { directory });
 		}
 	},
 });
