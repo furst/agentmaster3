@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
-import { MessageList } from './Message.js';
-import { ToolCallList } from './ToolCall.js';
-import { SubAgentStatus } from './SubAgentStatus.js';
-import { TodoList } from './TodoList.js';
 import { PlanReview, PlanModeIndicator } from './PlanReview.js';
+import { TimelineView } from './TimelineView.js';
 import { InlineTimeline } from './Timeline.js';
 import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
 import { ModelIndicator } from './ModelIndicator.js';
-import { useAgent, type Agent } from '../core/agent.js';
+import { type Agent } from '../core/agent.js';
+import { useAgentTimeline } from '../core/timeline.js';
 import {
 	createPlan,
 	approvePlan,
@@ -66,16 +64,17 @@ export function AgentShell({
 }: AgentShellProps) {
 	const { exit } = useApp();
 	const {
+		timeline,
+		streamingEntry,
 		messages,
 		isLoading,
-		streamingContent,
 		currentToolCalls,
 		error,
 		stats,
 		sendMessage,
 		cancel,
 		reset,
-	} = useAgent(agent);
+	} = useAgentTimeline(agent);
 
 	const [hasStarted, setHasStarted] = useState(false);
 	// Key to force re-mount TextInput after submission (clears the input)
@@ -283,14 +282,14 @@ Provide a revised plan in the same format:
 		[isLoading, isPlanProcessing, planModeEnabled, currentPlan, sendMessage, createPlanFromPrompt]
 	);
 
-	// Determine current status for timeline
+	// Determine current status for inline status bar
 	const getStatus = (): 'idle' | 'thinking' | 'tool' | 'responding' => {
 		if (!isLoading) return 'idle';
 
 		const runningTools = currentToolCalls.filter((tc) => tc.status === 'running');
 		if (runningTools.length > 0) return 'tool';
 
-		if (streamingContent) return 'responding';
+		if (streamingEntry) return 'responding';
 
 		return 'thinking';
 	};
@@ -298,23 +297,34 @@ Provide a revised plan in the same format:
 	const currentStatus = getStatus();
 	const runningTool = currentToolCalls.find((tc) => tc.status === 'running');
 
-	// Filter out internal planning messages from display
-	const displayMessages = useMemo(() => {
-		return messages.filter((msg) => {
-			// Only filter user messages that are internal planning prompts
-			if (msg.role === 'user' && isPlanningMessage(msg.content)) {
+	// Filter out internal planning messages from timeline display
+	const displayTimeline = useMemo(() => {
+		return timeline.filter((entry) => {
+			// Filter user messages that are internal planning prompts
+			if (entry.type === 'user-message' && entry.content && isPlanningMessage(entry.content)) {
 				return false;
 			}
-			// Hide assistant plan response if we're showing PlanReview
-			if (msg.role === 'assistant' && currentPlan?.status === 'draft') {
-				// Check if this is the plan response (contains objective + steps format)
-				if (msg.content.includes('**Objective:**') && msg.content.includes('**Steps:**')) {
+			// Filter assistant text that contains plan format when showing PlanReview
+			if (entry.type === 'text-segment' && entry.content && currentPlan?.status === 'draft') {
+				if (entry.content.includes('**Objective:**') && entry.content.includes('**Steps:**')) {
 					return false;
 				}
 			}
 			return true;
 		});
-	}, [messages, currentPlan]);
+	}, [timeline, currentPlan]);
+
+	// Filter streaming entry for planning content
+	const displayStreamingEntry = useMemo(() => {
+		if (!streamingEntry) return null;
+		// Don't show streaming if it's a plan response
+		if (currentPlan?.status === 'draft' && streamingEntry.content) {
+			if (streamingEntry.content.includes('**Objective:**')) {
+				return null;
+			}
+		}
+		return streamingEntry;
+	}, [streamingEntry, currentPlan]);
 
 	return (
 		<Box flexDirection="column" padding={1}>
@@ -335,32 +345,14 @@ Provide a revised plan in the same format:
 			)}
 
 			{/* Welcome message */}
-			{welcomeMessage && !hasStarted && messages.length === 0 && (
+			{welcomeMessage && !hasStarted && timeline.length === 0 && (
 				<Box marginBottom={1}>
 					<Text color="gray">{welcomeMessage}</Text>
 				</Box>
 			)}
 
-			{/* Message history */}
-			<MessageList messages={displayMessages} streamingContent={streamingContent} />
-
-			{/* Tool calls section */}
-			{currentToolCalls.length > 0 && (
-				<Box flexDirection="column" marginY={1}>
-					<Box marginBottom={0}>
-						<Text color="gray" dimColor>
-							⚙ Tools
-						</Text>
-					</Box>
-					<ToolCallList toolCalls={currentToolCalls} showCompleted={true} />
-				</Box>
-			)}
-
-			{/* Sub-agent status section */}
-			{isLoading && <SubAgentStatus showCompletedTools={true} maxToolCalls={5} />}
-
-			{/* Todo list section */}
-			<TodoList sessionId={agent.getSessionId()} maxItems={10} />
+			{/* Timeline view - shows messages, tool calls, and sub-agents interleaved */}
+			<TimelineView entries={displayTimeline} streamingEntry={displayStreamingEntry} isLoading={isLoading} />
 
 			{/* Plan review section */}
 			{currentPlan && currentPlan.status === 'draft' && (

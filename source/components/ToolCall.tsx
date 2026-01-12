@@ -168,7 +168,6 @@ export function ToolCall({
 	error,
 	duration,
 }: ToolCallProps) {
-	// Status indicator
 	const StatusIndicator = () => {
 		switch (status) {
 			case 'pending':

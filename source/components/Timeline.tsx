@@ -80,7 +80,6 @@ interface TimelineItemProps {
 function TimelineItem({ event, isLast, showTimestamp, relativeTime }: TimelineItemProps) {
 	const { type, name, status, duration, detail, timestamp } = event;
 
-	// Icon based on event type and status
 	const getIcon = () => {
 		if (status === 'running') {
 			return <InkSpinner />;

@@ -23,6 +23,7 @@ source/
 │   ├── llm.ts          # Anthropic client wrapper
 │   ├── tools.ts        # Tool definition helpers
 │   ├── agent.ts        # Agent factory + useAgent hook
+│   ├── timeline.ts     # Timeline types + useAgentTimeline hook
 │   ├── events.ts       # Event bus for sub-agent/todo communication
 │   ├── session-todo.ts # Session-scoped todo state management
 │   └── sub-agent.ts    # Sub-agent factory (hierarchical agents)
@@ -32,14 +33,15 @@ source/
 │   ├── web-research-agent.ts # Web search and content fetching
 │   └── vault-agent.ts  # Obsidian vault operations
 ├── components/
-│   ├── AgentShell.tsx  # Main agent UI wrapper
+│   ├── AgentShell.tsx  # Main agent UI wrapper (uses TimelineView)
+│   ├── TimelineView.tsx # Chronological view of messages and tool calls
 │   ├── Message.tsx     # Message rendering (supports ContentCard markers)
 │   ├── ContentCard.tsx # Highlighted content boxes for important data
 │   ├── ToolCall.tsx    # Tool call visualization (Claude Code-inspired)
 │   ├── SubAgentStatus.tsx # Sub-agent progress visualization
 │   ├── TodoList.tsx    # Session-scoped todo list display
 │   ├── ModelIndicator.tsx # Displays current model and reasoning status in header
-│   ├── Timeline.tsx    # Status timeline
+│   ├── Timeline.tsx    # Status timeline (inline status bar)
 │   ├── Spinner.tsx     # Loading indicators
 │   └── Error.tsx       # Error displays
 ├── tools/
@@ -504,6 +506,48 @@ const {
   cancel,            // Cancel current request
   reset,             // Reset conversation
 } = useAgent(agent);
+```
+
+### useAgentTimeline(agent)
+
+React hook that wraps `useAgent` and provides a chronological timeline view where text segments and tool calls are interleaved in the order they occurred (Claude Code-style):
+
+```typescript
+const {
+  // Timeline state
+  timeline,          // TimelineEntry[] - chronological entries
+  streamingEntry,    // Current streaming text segment (or null)
+
+  // Original state (backwards compatible)
+  messages,          // Conversation history
+  isLoading,         // Currently processing
+  currentToolCalls,  // Active tool executions
+  error,             // Any error that occurred
+  stats,             // Cost and token tracking
+
+  // Actions
+  sendMessage,       // Send a new message
+  cancel,            // Cancel current request
+  reset,             // Reset conversation
+} = useAgentTimeline(agent);
+```
+
+**TimelineEntry types:**
+- `user-message` - User input
+- `text-segment` - Finalized assistant text
+- `tool-call` - Tool invocation with status
+- `streaming-text` - Currently streaming text
+
+**Visual output (via TimelineView component):**
+```
+> User message here
+
+● Assistant text starts here...
+
+● search_vault "recipe beef"
+└  4 notes found
+
+● More assistant text after tool...
 ```
 
 ### defineTool(definition)

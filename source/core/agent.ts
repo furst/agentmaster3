@@ -754,6 +754,14 @@ export function useAgent(agent: Agent) {
 
 					case 'finish':
 						setStreamingContent('');
+						// Force any stuck 'running' tool calls to complete
+						setCurrentToolCalls((prev) =>
+							prev.map((tc) =>
+								tc.status === 'running'
+									? { ...tc, status: 'complete' as const, endTime: Date.now() }
+									: tc
+							)
+						);
 						if (assistantContent) {
 							const assistantMessage: Message = {
 								id: generateMessageId(),

@@ -10,9 +10,6 @@ import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
 import { createVaultAgent } from "../agents/vault-agent.js";
 import { createWebResearchAgent } from "../agents/web-research-agent.js";
 
-// Direct tools
-import { createTodosTool, updateTodoTool, getTodosTool } from "../tools/session-todo.js";
-
 export const options = z.object({
   prompt: z
     .string()
@@ -51,24 +48,7 @@ function buildSystemPrompt(): string {
       },
     ],
 
-    directTools: [
-      { name: "create_todos", description: "Create task list for complex work" },
-      { name: "update_todo", description: "Update task progress" },
-      { name: "get_todos", description: "Check current tasks" },
-    ],
-
-    additionalInstructions: `## Task Tracking
-
-For complex tasks with 3+ steps, create a todo list first:
-1. Call \`create_todos\` with specific, actionable items
-2. As you work, call \`update_todo\` to mark items in_progress then completed
-3. This helps track progress and keeps the user informed
-
-Example: "Research 3 topics" → create_todos with ["Research topic 1", "Research topic 2", "Research topic 3"]
-
-DO NOT create todos for simple single-step tasks.
-
-## General Guidelines
+    additionalInstructions: `## General Guidelines
 
 - Be clear and concise
 - When fetching content from the web, offer to save useful items to the vault
@@ -117,9 +97,6 @@ export default function Ask({ options }: Props) {
       tools: createToolsRecord([
         vaultAgent,
         webResearchAgent,
-        createTodosTool,
-        updateTodoTool,
-        getTodosTool,
       ]),
     });
   }, [modelsConfig.light, vaultAgent, webResearchAgent]);

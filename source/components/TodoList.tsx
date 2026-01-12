@@ -20,6 +20,9 @@ export interface TodoListProps {
 
 	/** Show completed items */
 	showCompleted?: boolean;
+
+	/** Whether the agent is currently loading (affects spinner display) */
+	isAgentLoading?: boolean;
 }
 
 // ============================================================================
@@ -29,9 +32,10 @@ export interface TodoListProps {
 interface TodoItemDisplayProps {
 	todo: TodoItem;
 	isLast: boolean;
+	isAgentLoading?: boolean;
 }
 
-function TodoItemDisplay({ todo, isLast }: TodoItemDisplayProps) {
+function TodoItemDisplay({ todo, isLast, isAgentLoading = true }: TodoItemDisplayProps) {
 	const connector = isLast ? '└─ ' : '├─ ';
 
 	const StatusIcon = () => {
@@ -39,7 +43,12 @@ function TodoItemDisplay({ todo, isLast }: TodoItemDisplayProps) {
 			case 'pending':
 				return <Text color="gray">○</Text>;
 			case 'in_progress':
-				return <InkSpinner />;
+				// Only show spinner if agent is actively loading
+				// Otherwise show a static indicator (stalled/incomplete)
+				if (isAgentLoading) {
+					return <InkSpinner />;
+				}
+				return <Text color="yellow">○</Text>; // Stalled - incomplete
 			case 'completed':
 				return <Text color="green">✓</Text>;
 		}
@@ -49,7 +58,7 @@ function TodoItemDisplay({ todo, isLast }: TodoItemDisplayProps) {
 		todo.status === 'completed'
 			? 'gray'
 			: todo.status === 'in_progress'
-				? 'cyan'
+				? (isAgentLoading ? 'cyan' : 'yellow') // Yellow when stalled
 				: 'white';
 
 	return (
@@ -77,6 +86,7 @@ export function TodoList({
 	compact = false,
 	maxItems = 0,
 	showCompleted = true,
+	isAgentLoading = false,
 }: TodoListProps) {
 	const [todos, setTodos] = useState<TodoItem[]>([]);
 
@@ -163,6 +173,7 @@ export function TodoList({
 					key={todo.id}
 					todo={todo}
 					isLast={index === displayTodos.length - 1}
+					isAgentLoading={isAgentLoading}
 				/>
 			))}
 
