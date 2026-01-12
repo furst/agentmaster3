@@ -83,5 +83,29 @@ Returns a synthesized summary of findings with sources.`,
 			}
 			return task;
 		},
+		// Strip raw tool results to prevent token explosion - only return the synthesized summary
+		resultTransformer: (response, toolCalls) => {
+			// Only include tool call metadata, not the full results
+			const toolSummary = toolCalls.map((tc) => ({
+				tool: tc.name,
+				duration: tc.duration,
+				// For search: just show query and result count
+				...(tc.name === 'exa_search' && {
+					query: (tc.args as { query?: string }).query,
+					resultCount: (tc.result as { resultCount?: number })?.resultCount,
+				}),
+				// For contents: just show URL count
+				...(tc.name === 'exa_get_contents' && {
+					urlCount: (tc.args as { urls?: string[] }).urls?.length,
+				}),
+			}));
+
+			return {
+				success: true,
+				response,
+				toolCallCount: toolCalls.length,
+				toolSummary,
+			};
+		},
 	});
 }

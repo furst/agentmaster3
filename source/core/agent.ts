@@ -304,7 +304,10 @@ export function createAgent(config: AgentConfig) {
 					};
 
 					// Type-safe execution - tool.execute expects ToolContext which includes sessionId
-					const result = await tool.execute(params, contextWithSession);
+					if (!tool.execute) {
+						return { success: false, error: 'Tool has no execute function' };
+					}
+					const result = await tool.execute(params, contextWithSession as Parameters<typeof tool.execute>[1]);
 					const duration = Date.now() - startTime;
 
 					// After hook

@@ -15,7 +15,7 @@ import {
 	clearPlan,
 	type Plan,
 } from './session-plan.js';
-import type { Agent, AgentStats } from './agent.js';
+import type { Agent } from './agent.js';
 
 // Planning prompt markers for filtering in UI
 export const PLAN_PROMPT_MARKERS = [

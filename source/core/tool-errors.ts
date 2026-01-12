@@ -62,7 +62,7 @@ export function handleFileError(
 	context?: Record<string, unknown>
 ): ToolErrorResult {
 	const err = error as NodeJS.ErrnoException;
-	const path = context?.path ?? context?.directory ?? context?.filePath ?? '';
+	const path = context?.['path'] ?? context?.['directory'] ?? context?.['filePath'] ?? '';
 
 	switch (err.code) {
 		case 'ENOENT':

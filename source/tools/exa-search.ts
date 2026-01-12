@@ -3,6 +3,32 @@ import { defineTool } from '../core/tools.js';
 
 const EXA_API_BASE = 'https://api.exa.ai';
 
+// Default max characters per article - generous limit since sub-agents
+// use resultTransformer to return only summaries, not raw content
+const DEFAULT_MAX_TEXT_CHARS = 20000;
+
+/**
+ * Truncate text to prevent token explosion, trying to cut at sentence boundaries
+ */
+function truncateText(
+	text: string,
+	maxChars: number
+): { text: string; truncated: boolean; originalLength: number } {
+	const originalLength = text.length;
+	if (text.length <= maxChars) {
+		return { text, truncated: false, originalLength };
+	}
+	// Try to truncate at a sentence boundary
+	const sliced = text.slice(0, maxChars);
+	const lastSentence = sliced.lastIndexOf('. ');
+	const cutPoint = lastSentence > maxChars * 0.7 ? lastSentence + 1 : maxChars;
+	return {
+		text: text.slice(0, cutPoint) + '\n\n[Content truncated...]',
+		truncated: true,
+		originalLength,
+	};
+}
+
 function getExaApiKey(): string {
 	const apiKey = process.env['EXA_API_KEY'];
 	if (!apiKey) {
@@ -143,14 +169,32 @@ For other sites, you can search first, then use exa_get_contents to fetch full t
 				success: true,
 				query,
 				resultCount: data.results.length,
-				results: data.results.map((r) => ({
-					title: r.title,
-					url: r.url,
-					publishedDate: r.publishedDate,
-					author: r.author,
-					score: r.score,
-					...(r.text && { text: r.text }),
-				})),
+				results: data.results.map((r) => {
+					// Truncate text if present to prevent token explosion
+					if (r.text) {
+						const { text, truncated, originalLength } = truncateText(
+							r.text,
+							DEFAULT_MAX_TEXT_CHARS
+						);
+						return {
+							title: r.title,
+							url: r.url,
+							publishedDate: r.publishedDate,
+							author: r.author,
+							score: r.score,
+							text,
+							truncated,
+							originalLength,
+						};
+					}
+					return {
+						title: r.title,
+						url: r.url,
+						publishedDate: r.publishedDate,
+						author: r.author,
+						score: r.score,
+					};
+				}),
 			};
 		} catch (error) {
 			return {
@@ -167,7 +211,7 @@ For other sites, you can search first, then use exa_get_contents to fetch full t
 export const exaGetContentsTool = defineTool({
 	name: 'exa_get_contents',
 	description:
-		'Fetch the full text content of URLs. Use this after exa_search to get the actual article text for summarization.',
+		'Fetch the full text content of URLs. Use this after exa_search to get the actual article text for summarization. Text is automatically truncated to prevent token overflow.',
 	parameters: z.object({
 		urls: z
 			.array(z.string())
@@ -177,8 +221,13 @@ export const exaGetContentsTool = defineTool({
 			.optional()
 			.default(false)
 			.describe('Extract key highlights/quotes from the content'),
+		maxCharsPerArticle: z
+			.number()
+			.optional()
+			.default(DEFAULT_MAX_TEXT_CHARS)
+			.describe(`Max characters per article (default ${DEFAULT_MAX_TEXT_CHARS}). Use lower values when fetching many articles.`),
 	}),
-	execute: async ({ urls, highlights }) => {
+	execute: async ({ urls, highlights, maxCharsPerArticle }) => {
 		try {
 			const apiKey = getExaApiKey();
 
@@ -215,17 +264,24 @@ export const exaGetContentsTool = defineTool({
 
 			const data = (await response.json()) as ExaContentsResponse;
 
+			const maxChars = maxCharsPerArticle ?? DEFAULT_MAX_TEXT_CHARS;
+
 			return {
 				success: true,
 				contentCount: data.results.length,
-				contents: data.results.map((r) => ({
-					title: r.title,
-					url: r.url,
-					publishedDate: r.publishedDate,
-					author: r.author,
-					text: r.text,
-					highlights: r.highlights,
-				})),
+				contents: data.results.map((r) => {
+					const { text, truncated, originalLength } = truncateText(r.text, maxChars);
+					return {
+						title: r.title,
+						url: r.url,
+						publishedDate: r.publishedDate,
+						author: r.author,
+						text,
+						truncated,
+						originalLength,
+						highlights: r.highlights,
+					};
+				}),
 			};
 		} catch (error) {
 			return {
