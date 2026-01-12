@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { createSubAgentTool } from '../core/sub-agent.js';
-import { getModelsConfig } from '../core/project-config.js';
+import { createSimpleSubAgent } from '../core/sub-agent.js';
 import {
 	listVaultNotesTool,
 	readVaultNoteTool,
@@ -20,9 +19,7 @@ import {
  * Used by: ask (knowledge management)
  */
 export function createVaultAgent() {
-	const modelsConfig = getModelsConfig();
-
-	return createSubAgentTool({
+	return createSimpleSubAgent({
 		name: 'vault_agent',
 		description: `Specialized agent for Obsidian vault operations. Delegate to this agent when you need to:
 - Search for notes by content or keywords
@@ -52,7 +49,6 @@ Returns the requested information or confirms actions taken.`,
 - When creating notes, use clear structure with headers
 - Preserve existing content when updating (use append mode when appropriate)
 - Report what you found or what actions you took`,
-		model: modelsConfig.light,
 		tools: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
 		maxSteps: 6,
 		inputSchema: z.object({
