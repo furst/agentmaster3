@@ -1,11 +1,13 @@
-import React, { useMemo } from "react";
-import { z } from "zod";
-import { createAgent } from "../core/agent.js";
+import React from "react";
 import { AgentShell } from "../components/AgentShell.js";
-import { createToolsRecord } from "../core/tools.js";
 import { getModelsConfig } from "../core/project-config.js";
 import { buildOrchestratorPrompt } from "../core/orchestrator-prompt.js";
 import { buildMemoryPromptSection } from "../core/memory.js";
+import {
+  commandOptions,
+  type CommandProps,
+  useAgentCommand,
+} from "../core/command-helpers.js";
 
 // Tools
 import { saveMemoryTool } from "../tools/memory.js";
@@ -14,16 +16,7 @@ import { saveMemoryTool } from "../tools/memory.js";
 import { createVaultAgent } from "../agents/vault-agent.js";
 import { createWebResearchAgent } from "../agents/web-research-agent.js";
 
-export const options = z.object({
-  prompt: z
-    .string()
-    .optional()
-    .describe("Initial prompt to send to the assistant"),
-});
-
-type Props = {
-  options: z.infer<typeof options>;
-};
+export const options = commandOptions;
 
 const AGENT_NAME = "ask";
 
@@ -89,25 +82,16 @@ Save to memory (agentName="${AGENT_NAME}") when user shares:
   });
 }
 
-export default function Ask({ options }: Props) {
+export default function Ask({ options }: CommandProps) {
   const modelsConfig = getModelsConfig();
 
-  // Create sub-agents
-  const vaultAgent = useMemo(() => createVaultAgent(), []);
-  const webResearchAgent = useMemo(() => createWebResearchAgent(), []);
-
-  const agent = useMemo(() => {
-    return createAgent({
-      name: "ask",
-      systemPrompt: buildSystemPrompt(),
-      model: modelsConfig.light,
-      tools: createToolsRecord([
-        saveMemoryTool,
-        vaultAgent,
-        webResearchAgent,
-      ]),
-    });
-  }, [modelsConfig.light, vaultAgent, webResearchAgent]);
+  const agent = useAgentCommand({
+    name: AGENT_NAME,
+    buildSystemPrompt,
+    model: modelsConfig.light,
+    tools: [saveMemoryTool],
+    subAgents: [createVaultAgent, createWebResearchAgent],
+  });
 
   return (
     <AgentShell

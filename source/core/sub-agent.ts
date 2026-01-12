@@ -3,6 +3,7 @@ import { generateText, stepCountIs } from 'ai';
 import { defineTool, createToolsRecord, type CoreTool } from './tools.js';
 import { createModel } from './llm.js';
 import { agentEvents, generateProcessId } from './events.js';
+import { getModelsConfig } from './project-config.js';
 
 // ============================================================================
 // Types
@@ -290,3 +291,97 @@ export function createSubAgentTool(config: SubAgentConfig): {
 		},
 	});
 }
+
+// ============================================================================
+// Simplified Factory (Auto Model Config)
+// ============================================================================
+
+/**
+ * Simplified sub-agent config - model is loaded automatically from project config
+ */
+export interface SimpleSubAgentConfig {
+	/** Tool name (snake_case) - used as the tool identifier */
+	name: string;
+
+	/** Description shown to the LLM when deciding to use this sub-agent */
+	description: string;
+
+	/** System prompt for the sub-agent */
+	systemPrompt: string;
+
+	/** Tools available to the sub-agent */
+	tools: Array<{ name: string; tool: CoreTool }>;
+
+	/** Maximum agentic steps (default: 6) */
+	maxSteps?: number;
+
+	/** Custom input schema. Default: { task: string, context?: string } */
+	inputSchema?: z.ZodObject<z.ZodRawShape>;
+
+	/** Transform input params to task string */
+	taskTransformer?: (input: Record<string, unknown>) => string;
+
+	/** Use strong model instead of light (default: false) */
+	useStrongModel?: boolean;
+}
+
+/**
+ * Creates a sub-agent tool with automatic model config loading.
+ * Uses the light model by default (configurable via useStrongModel).
+ *
+ * @example
+ * export function createPdfAgent() {
+ *   return createSimpleSubAgent({
+ *     name: 'pdf_agent',
+ *     description: 'Analyzes PDF documents',
+ *     systemPrompt: 'You are a PDF specialist...',
+ *     tools: [listPdfsTool, readPdfTool],
+ *   });
+ * }
+ */
+export function createSimpleSubAgent(config: SimpleSubAgentConfig): {
+	name: string;
+	tool: CoreTool;
+} {
+	const modelsConfig = getModelsConfig();
+
+	return createSubAgentTool({
+		name: config.name,
+		description: config.description,
+		systemPrompt: config.systemPrompt,
+		model: config.useStrongModel ? modelsConfig.strong : modelsConfig.light,
+		tools: config.tools,
+		maxSteps: config.maxSteps ?? 6,
+		inputSchema: config.inputSchema,
+		taskTransformer: config.taskTransformer,
+	});
+}
+
+// ============================================================================
+// Common Input Schemas
+// ============================================================================
+
+/**
+ * Common input schema for task-based sub-agents
+ */
+export const taskInputSchema = z.object({
+	task: z.string().describe('The task for the sub-agent to complete'),
+	context: z.string().optional().describe('Additional context or constraints'),
+});
+
+/**
+ * Common input schema for query-based sub-agents (search, research)
+ */
+export const queryInputSchema = z.object({
+	query: z.string().describe('What to search for or research'),
+	context: z.string().optional().describe('Additional context for the search'),
+});
+
+/**
+ * Common input schema for file-based sub-agents
+ */
+export const fileInputSchema = z.object({
+	task: z.string().describe('What to do with the file(s)'),
+	filePath: z.string().optional().describe('Full path to a specific file'),
+	directory: z.string().optional().describe('Directory path to search'),
+});

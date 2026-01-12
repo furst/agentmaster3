@@ -1,6 +1,4 @@
-import { z } from 'zod';
-import { createSubAgentTool } from '../core/sub-agent.js';
-import { getModelsConfig } from '../core/project-config.js';
+import { createSimpleSubAgent, fileInputSchema } from '../core/sub-agent.js';
 import { listPdfsTool } from '../tools/list-pdfs.js';
 import { readPdfTool } from '../tools/read-pdf.js';
 
@@ -16,9 +14,7 @@ import { readPdfTool } from '../tools/read-pdf.js';
  * Used by: finance (newsletters), ask (general documents)
  */
 export function createPdfAgent() {
-	const modelsConfig = getModelsConfig();
-
-	return createSubAgentTool({
+	return createSimpleSubAgent({
 		name: 'pdf_agent',
 		description: `Specialized agent for PDF document analysis. Delegate to this agent when you need to:
 - List available PDF files in a directory
@@ -46,14 +42,9 @@ Returns a summary of findings from the documents.`,
 - If a document is too long, summarize the most relevant sections
 - Always mention the source document name in your response
 - For financial documents, pay attention to numbers, dates, and recommendations`,
-		model: modelsConfig.light,
 		tools: [listPdfsTool, readPdfTool],
 		maxSteps: 6,
-		inputSchema: z.object({
-			task: z.string().describe('What to do with the PDF(s)'),
-			directory: z.string().optional().describe('Directory path to search for PDFs'),
-			filePath: z.string().optional().describe('Full path to a specific PDF file'),
-		}),
+		inputSchema: fileInputSchema,
 		taskTransformer: (input) => {
 			let task = input['task'] as string;
 			if (input['filePath']) {

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { streamResponse, generateStructuredOutput, calculateCost, type CoreMessage, type CoreTool, type ReasoningConfig, type TokenUsage, type CostTracking } from './llm.js';
 import { getAgentConfig } from './config.js';
 import { createSubAgentTool, type SubAgentConfig } from './sub-agent.js';
+import { type ToolContext } from './tools.js';
 import { z } from 'zod';
 
 // ============================================================================
@@ -272,7 +273,7 @@ export function createAgent(config: AgentConfig) {
 			// Create a wrapped version of the tool
 			const wrappedTool: CoreTool = {
 				...tool,
-				execute: async (params: Record<string, unknown>, context: { toolCallId: string; messages: unknown[]; abortSignal?: AbortSignal }) => {
+				execute: async (params: Record<string, unknown>, context: ToolContext) => {
 					const fullContext: ToolHookContext = {
 						...hookContext,
 						toolCallId: context.toolCallId,
@@ -297,11 +298,13 @@ export function createAgent(config: AgentConfig) {
 
 					// Execute original tool with sessionId injected into context
 					const startTime = Date.now();
-					const contextWithSession = {
+					const contextWithSession: ToolContext = {
 						...context,
 						sessionId: currentSessionId,
 					};
-					const result = await (tool.execute as (params: Record<string, unknown>, context: { toolCallId: string; messages: unknown[]; abortSignal?: AbortSignal; sessionId?: string }) => Promise<unknown>)(params, contextWithSession);
+
+					// Type-safe execution - tool.execute expects ToolContext which includes sessionId
+					const result = await tool.execute(params, contextWithSession);
 					const duration = Date.now() - startTime;
 
 					// After hook
