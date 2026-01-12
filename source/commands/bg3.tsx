@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
-import { z } from "zod";
-import { createAgent } from "../core/agent.js";
+import React from "react";
 import { AgentShell } from "../components/AgentShell.js";
-import { createToolsRecord } from "../core/tools.js";
 import { getModelsConfig } from "../core/project-config.js";
 import { buildMemoryPromptSection } from "../core/memory.js";
+import {
+  commandOptions,
+  type CommandProps,
+  useAgentCommand,
+} from "../core/command-helpers.js";
 
 // Tools
 import { saveMemoryTool } from "../tools/memory.js";
@@ -12,16 +14,7 @@ import { saveMemoryTool } from "../tools/memory.js";
 // Sub-agents
 import { createWebResearchAgent } from "../agents/web-research-agent.js";
 
-export const options = z.object({
-  prompt: z
-    .string()
-    .optional()
-    .describe("Initial prompt or question about BG3"),
-});
-
-type Props = {
-  options: z.infer<typeof options>;
-};
+export const options = commandOptions;
 
 const AGENT_NAME = "bg3";
 
@@ -75,24 +68,17 @@ Save to memory when user shares:
 Use save_memory with agentName="${AGENT_NAME}".`;
 }
 
-export default function BG3({ options }: Props) {
+export default function BG3({ options }: CommandProps) {
   const modelsConfig = getModelsConfig();
 
-  // Web research for wiki lookups
-  const webResearchAgent = useMemo(() => createWebResearchAgent(), []);
-
-  const agent = useMemo(() => {
-    return createAgent({
-      name: AGENT_NAME,
-      systemPrompt: buildSystemPrompt(),
-      model: modelsConfig.light,
-      tools: createToolsRecord([
-        saveMemoryTool,
-        webResearchAgent,
-      ]),
-      maxIterations: 8,
-    });
-  }, [modelsConfig.light, webResearchAgent]);
+  const agent = useAgentCommand({
+    name: AGENT_NAME,
+    buildSystemPrompt,
+    model: modelsConfig.light,
+    tools: [saveMemoryTool],
+    subAgents: [createWebResearchAgent],
+    maxIterations: 8,
+  });
 
   return (
     <AgentShell
