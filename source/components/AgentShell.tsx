@@ -87,22 +87,30 @@ export function AgentShell({
 	const [isPlanProcessing, setIsPlanProcessing] = useState(false);
 	const pendingPromptRef = useRef<string | null>(null);
 
-	// Load any existing plan on mount
+	// Track initialization state with ref to prevent race conditions
+	const isInitializedRef = useRef(false);
+
+	// Combined initialization effect - handles both plan loading and initial prompt
+	// This prevents race conditions between separate effects
 	useEffect(() => {
+		if (isInitializedRef.current) return;
+		isInitializedRef.current = true;
+
+		// First, check for existing plan (synchronous)
 		const existingPlan = loadPlan(agent.getSessionId());
 		if (existingPlan && existingPlan.status === 'draft') {
 			setCurrentPlan(existingPlan);
 			setPlanModeEnabled(true);
+			// Don't send initial prompt when resuming a plan
+			return;
 		}
-	}, [agent]);
 
-	// Handle initial prompt (skip if plan mode would interfere)
-	useEffect(() => {
-		if (initialPrompt && !hasStarted && !planModeEnabled) {
+		// No existing plan - handle initial prompt if provided
+		if (initialPrompt) {
 			setHasStarted(true);
 			sendMessage(initialPrompt);
 		}
-	}, [initialPrompt, hasStarted, sendMessage, planModeEnabled]);
+	}, [agent, initialPrompt, sendMessage]);
 
 	// Handle keyboard shortcuts
 	useInput((input, key) => {

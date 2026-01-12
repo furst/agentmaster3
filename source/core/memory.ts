@@ -50,11 +50,16 @@ export async function saveAgentMemory(
 			mkdirSync(dir, { recursive: true });
 		}
 
+		// Check if file exists BEFORE writing (for correct action reporting)
+		const fileExisted = existsSync(path);
 		let finalContent = content;
-		if (append && existsSync(path)) {
+		let didAppend = false;
+
+		if (append && fileExisted) {
 			const existing = readFileSync(path, 'utf-8');
 			const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 			finalContent = `${existing.trimEnd()}\n\n---\n*Updated: ${timestamp}*\n\n${content}`;
+			didAppend = true;
 		}
 
 		writeFileSync(path, finalContent, 'utf-8');
@@ -62,7 +67,7 @@ export async function saveAgentMemory(
 		return {
 			success: true,
 			path,
-			action: append && existsSync(path) ? 'appended' : 'created',
+			action: didAppend ? 'appended' : fileExisted ? 'updated' : 'created',
 		};
 	} catch (error) {
 		return {
