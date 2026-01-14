@@ -211,7 +211,7 @@ For other sites, you can search first, then use exa_get_contents to fetch full t
 export const exaGetContentsTool = defineTool({
 	name: 'exa_get_contents',
 	description:
-		'Fetch the full text content of URLs. Use this after exa_search to get the actual article text for summarization. Text is automatically truncated to prevent token overflow.',
+		'Fetch the full text content of URLs. Use this to get complete article text for saving or detailed analysis.',
 	parameters: z.object({
 		urls: z
 			.array(z.string())
@@ -221,13 +221,8 @@ export const exaGetContentsTool = defineTool({
 			.optional()
 			.default(false)
 			.describe('Extract key highlights/quotes from the content'),
-		maxCharsPerArticle: z
-			.number()
-			.optional()
-			.default(DEFAULT_MAX_TEXT_CHARS)
-			.describe(`Max characters per article (default ${DEFAULT_MAX_TEXT_CHARS}). Use lower values when fetching many articles.`),
 	}),
-	execute: async ({ urls, highlights, maxCharsPerArticle }) => {
+	execute: async ({ urls, highlights }) => {
 		try {
 			const apiKey = getExaApiKey();
 
@@ -264,24 +259,17 @@ export const exaGetContentsTool = defineTool({
 
 			const data = (await response.json()) as ExaContentsResponse;
 
-			const maxChars = maxCharsPerArticle ?? DEFAULT_MAX_TEXT_CHARS;
-
 			return {
 				success: true,
 				contentCount: data.results.length,
-				contents: data.results.map((r) => {
-					const { text, truncated, originalLength } = truncateText(r.text, maxChars);
-					return {
-						title: r.title,
-						url: r.url,
-						publishedDate: r.publishedDate,
-						author: r.author,
-						text,
-						truncated,
-						originalLength,
-						highlights: r.highlights,
-					};
-				}),
+				contents: data.results.map((r) => ({
+					title: r.title,
+					url: r.url,
+					publishedDate: r.publishedDate,
+					author: r.author,
+					text: r.text,
+					highlights: r.highlights,
+				})),
 			};
 		} catch (error) {
 			return {

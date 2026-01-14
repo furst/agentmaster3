@@ -11,6 +11,7 @@ import {
 
 // Tools
 import { saveMemoryTool } from "../tools/memory.js";
+import { exaGetContentsTool } from "../tools/exa-search.js";
 
 // Sub-agents
 import { createVaultAgent } from "../agents/vault-agent.js";
@@ -54,6 +55,10 @@ function buildSystemPrompt(): string {
         name: "save_memory",
         description: "Save important context about user preferences or ongoing work",
       },
+      {
+        name: "exa_get_contents",
+        description: "Fetch full article content from URLs (use when saving to vault or need complete text)",
+      },
     ],
 
     additionalInstructions: `${memorySection}
@@ -89,7 +94,7 @@ export default function Ask({ options }: CommandProps) {
     name: AGENT_NAME,
     buildSystemPrompt,
     model: modelsConfig.light,
-    tools: [saveMemoryTool],
+    tools: [saveMemoryTool, exaGetContentsTool],
     subAgents: [createVaultAgent, createWebResearchAgent],
   });
 

@@ -10,6 +10,7 @@ import {
 
 // Tools
 import { saveMemoryTool } from "../tools/memory.js";
+import { exaGetContentsTool } from "../tools/exa-search.js";
 
 // Sub-agents
 import { createWebResearchAgent } from "../agents/web-research-agent.js";
@@ -75,7 +76,7 @@ export default function BG3({ options }: CommandProps) {
     name: AGENT_NAME,
     buildSystemPrompt,
     model: modelsConfig.light,
-    tools: [saveMemoryTool],
+    tools: [saveMemoryTool, exaGetContentsTool],
     subAgents: [createWebResearchAgent],
     maxIterations: 8,
   });
