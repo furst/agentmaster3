@@ -147,9 +147,11 @@ import { jinaReaderTool } from '../tools/jina-reader.js';
 
 ### exaSearchTool (exa_search)
 Semantic web search using Exa. Requires `EXA_API_KEY` environment variable.
+Supports `type` parameter: `"fast"` (sub-350ms), `"auto"` (default, balanced), `"deep"` (~3.5s, highest quality).
 ```typescript
 import { exaSearchTool } from '../tools/exa-search.js';
-// Returns: { success, query, resultCount, results: [{ title, url, publishedDate }] }
+// Parameters: { query, numResults?, type?: 'auto'|'fast'|'deep', includeDomains?, category?, includeText? }
+// Returns: { success, query, resultCount, results: [{ title, url, publishedDate, text? }] }
 ```
 
 ### exaGetContentsTool (exa_get_contents)
@@ -157,6 +159,30 @@ Fetch full text content of URLs using Exa. Requires `EXA_API_KEY`.
 ```typescript
 import { exaGetContentsTool } from '../tools/exa-search.js';
 // Returns: { success, contentCount, contents: [{ title, url, text }] }
+```
+
+### exaResearchTool (exa_research)
+Deep agentic web research. Spawns an AI research agent that plans, searches multiple times, and synthesizes findings. Takes 20-40 seconds. Requires `EXA_API_KEY`.
+```typescript
+import { exaResearchTool } from '../tools/exa-search.js';
+// Parameters: { instructions, outputSchema?, model?: 'exa-research'|'exa-research-pro' }
+// Returns: { success, taskId, model, durationMs, costDollars, output }
+```
+
+### exaAnswerTool (exa_answer)
+Direct Q&A with grounded citations. Faster than research (~5-10s), best for factual questions. Requires `EXA_API_KEY`.
+```typescript
+import { exaAnswerTool } from '../tools/exa-search.js';
+// Parameters: { query, outputSchema?, includeDomains?, excludeDomains? }
+// Returns: { success, query, answer, citationCount, citations: [{ url, title }] }
+```
+
+### exaFindSimilarTool (exa_find_similar)
+Find web content similar to a given URL. Good for discovering related articles or competitors. Requires `EXA_API_KEY`.
+```typescript
+import { exaFindSimilarTool } from '../tools/exa-search.js';
+// Parameters: { url, numResults?, excludeSourceDomain?, includeText? }
+// Returns: { success, sourceUrl, resultCount, results: [{ title, url, score }] }
 ```
 
 ### readFileTool (read_file)

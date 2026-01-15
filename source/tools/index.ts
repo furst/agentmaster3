@@ -4,7 +4,7 @@
 
 export { readFileTool } from './read-file.js';
 export { webSearchTool } from './web-search.js';
-export { exaSearchTool, exaGetContentsTool } from './exa-search.js';
+export { exaSearchTool, exaGetContentsTool, exaResearchTool, exaAnswerTool, exaFindSimilarTool } from './exa-search.js';
 export { jinaReaderTool } from './jina-reader.js';
 export { listPdfsTool } from './list-pdfs.js';
 export { readPdfTool } from './read-pdf.js';
@@ -17,7 +17,7 @@ export { saveMemoryTool } from './memory.js';
 
 import { readFileTool } from './read-file.js';
 import { webSearchTool } from './web-search.js';
-import { exaSearchTool, exaGetContentsTool } from './exa-search.js';
+import { exaSearchTool, exaGetContentsTool, exaResearchTool, exaAnswerTool, exaFindSimilarTool } from './exa-search.js';
 import { jinaReaderTool } from './jina-reader.js';
 import { listPdfsTool } from './list-pdfs.js';
 import { readPdfTool } from './read-pdf.js';
@@ -37,6 +37,9 @@ export const allTools = [
 	webSearchTool,
 	exaSearchTool,
 	exaGetContentsTool,
+	exaResearchTool,
+	exaAnswerTool,
+	exaFindSimilarTool,
 	jinaReaderTool,
 	listPdfsTool,
 	readPdfTool,
@@ -68,7 +71,7 @@ export const allToolsRecord = createToolsRecord(allTools);
  */
 export const toolCategories = {
 	filesystem: [readFileTool, listPdfsTool, readPdfTool],
-	web: [webSearchTool, exaSearchTool, exaGetContentsTool, jinaReaderTool],
+	web: [webSearchTool, exaSearchTool, exaGetContentsTool, exaResearchTool, exaAnswerTool, exaFindSimilarTool, jinaReaderTool],
 	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool, parseHoldingsImageTool, readHoldingsTool],
 	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
 	research: [saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
