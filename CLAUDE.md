@@ -16,7 +16,6 @@ source/
 ├── commands/           # Pastel command files (file-based routing)
 │   ├── index.tsx       # Default command (help)
 │   ├── ask.tsx         # General assistant agent
-│   ├── resume.tsx      # Resume previous sessions
 │   ├── news.tsx        # News aggregation agent
 │   └── bg3.tsx         # Baldur's Gate 3 assistant
 ├── core/
@@ -765,12 +764,9 @@ Supported models with pricing:
 
 ## Session Management
 
-Sessions are **automatically saved** when you exit an agent (Ctrl+C). Resume previous conversations using either:
+Sessions are **automatically saved** when you exit an agent (Ctrl+C). Use `/resume` inside any agent to continue a previous conversation.
 
-1. **`/resume` slash command** - Type `/resume` inside any agent to see previous sessions for that agent
-2. **`agentmaster resume`** - Standalone command to list all sessions across agents
-
-### /resume Slash Command (Inline)
+### /resume Slash Command
 
 Type `/resume` while inside any agent to see and select previous sessions:
 
@@ -786,23 +782,7 @@ Type `/resume` while inside any agent to see and select previous sessions:
 ↑↓ navigate | Enter: resume | d: delete | Esc: cancel
 ```
 
-This shows only sessions for the current agent and lets you resume without exiting.
-
-### Resume Command (Standalone)
-
-```bash
-# List all saved sessions
-agentmaster resume
-
-# Filter by agent name
-agentmaster resume --agent ask
-
-# Navigation:
-# - ↑↓ to navigate sessions
-# - Enter to resume selected session
-# - d to delete a session
-# - q to quit
-```
+This shows only sessions for the current agent. Select one to continue that conversation with full context preserved.
 
 Sessions are stored at `~/.config/agentmaster/sessions/{sessionId}/session.json`. Only the last 20 sessions per agent are kept.
 
@@ -1091,19 +1071,6 @@ General-purpose assistant with tools.
 node dist/cli.js ask
 node dist/cli.js ask --prompt "What is TypeScript?"
 ```
-
-### resume
-Resume a previous conversation from saved sessions.
-```bash
-node dist/cli.js resume
-node dist/cli.js resume --agent ask
-```
-
-Features:
-- Lists all saved sessions with preview
-- Navigate with arrow keys, Enter to select
-- Press 'd' to delete a session
-- Sessions are auto-saved on exit from any agent
 
 ### news
 News aggregation agent that fetches and summarizes news from configured sites.
