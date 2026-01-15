@@ -16,6 +16,7 @@ source/
 ├── commands/           # Pastel command files (file-based routing)
 │   ├── index.tsx       # Default command (help)
 │   ├── ask.tsx         # General assistant agent
+│   ├── resume.tsx      # Resume previous sessions
 │   ├── news.tsx        # News aggregation agent
 │   └── bg3.tsx         # Baldur's Gate 3 assistant
 ├── core/
@@ -27,6 +28,7 @@ source/
 │   ├── timeline.ts     # Timeline types + useAgentTimeline hook
 │   ├── events.ts       # Event bus for sub-agent/todo communication
 │   ├── session-todo.ts # Session-scoped todo state management
+│   ├── session-manager.ts # Session persistence for resume functionality
 │   ├── sub-agent.ts    # Sub-agent factory (hierarchical agents)
 │   └── memory.ts       # Per-agent persistent memory system
 ├── agents/             # Reusable sub-agent definitions
@@ -763,7 +765,29 @@ Supported models with pricing:
 
 ## Session Management
 
-Save and restore conversations for multi-turn workflows:
+Sessions are **automatically saved** when you exit an agent (Ctrl+C). Use the `resume` command to continue previous conversations.
+
+### Resume Command
+
+```bash
+# List all saved sessions
+agentmaster resume
+
+# Filter by agent name
+agentmaster resume --agent ask
+
+# Navigation:
+# - ↑↓ to navigate sessions
+# - Enter to resume selected session
+# - d to delete a session
+# - q to quit
+```
+
+Sessions are stored at `~/.config/agentmaster/sessions/{sessionId}/session.json`. Only the last 20 sessions per agent are kept.
+
+### Programmatic Session Management
+
+Save and restore conversations programmatically:
 
 ```typescript
 const agent = createAgent({ name: 'assistant', ... });
@@ -789,6 +813,39 @@ await newAgent.sendMessage('Show me how to fix the top issue', onEvent);
 
 // Get current session ID
 const sessionId = agent.getSessionId();
+```
+
+### Session Manager API (`source/core/session-manager.ts`)
+
+```typescript
+import {
+  saveSession,       // Save session to disk
+  loadSession,       // Load session by ID
+  listSessions,      // List all sessions (optionally filter by agent)
+  deleteSession,     // Delete a session
+  getSessionInfo,    // Get session metadata without full content
+  getAgentNames,     // Get all agent names with saved sessions
+  formatRelativeTime // Format timestamp as "2 hours ago"
+} from '../core/session-manager.js';
+
+// List sessions for a specific agent
+const sessions = listSessions('ask');
+// Returns: SessionInfo[] sorted by updatedAt (newest first)
+
+// SessionInfo contains:
+// { id, agentName, createdAt, updatedAt, messageCount, preview, totalTokens, costUSD }
+```
+
+### AgentShell Auto-Save
+
+The `AgentShell` component automatically saves sessions on exit. Disable with:
+
+```tsx
+<AgentShell
+  agent={agent}
+  name="My Agent"
+  autoSave={false}  // Disable auto-save
+/>
 ```
 
 **AgentSession interface:**
@@ -1008,11 +1065,24 @@ agentmaster3
 ## Existing Agents
 
 ### ask
-General-purpose assistant without tools.
+General-purpose assistant with tools.
 ```bash
 node dist/cli.js ask
 node dist/cli.js ask --prompt "What is TypeScript?"
 ```
+
+### resume
+Resume a previous conversation from saved sessions.
+```bash
+node dist/cli.js resume
+node dist/cli.js resume --agent ask
+```
+
+Features:
+- Lists all saved sessions with preview
+- Navigate with arrow keys, Enter to select
+- Press 'd' to delete a session
+- Sessions are auto-saved on exit from any agent
 
 ### news
 News aggregation agent that fetches and summarizes news from configured sites.

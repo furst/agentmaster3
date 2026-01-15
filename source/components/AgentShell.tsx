@@ -9,6 +9,7 @@ import { ModelIndicator } from './ModelIndicator.js';
 import { type Agent } from '../core/agent.js';
 import { useAgentTimeline } from '../core/timeline.js';
 import { usePlanMode, isPlanningMessage } from '../core/plan-mode.js';
+import { saveSession } from '../core/session-manager.js';
 
 // Image file extensions we detect
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
@@ -70,6 +71,8 @@ export interface AgentShellProps {
 	welcomeMessage?: string;
 	/** Whether to show the header */
 	showHeader?: boolean;
+	/** Whether to auto-save the session on exit (default: true) */
+	autoSave?: boolean;
 }
 
 /**
@@ -84,8 +87,11 @@ export function AgentShell({
 	initialPrompt,
 	welcomeMessage,
 	showHeader = true,
+	autoSave = true,
 }: AgentShellProps) {
 	const { exit } = useApp();
+	const agentRef = useRef(agent);
+	agentRef.current = agent;
 	const {
 		timeline,
 		streamingEntry,
@@ -147,6 +153,30 @@ export function AgentShell({
 		}
 	}, [initialPrompt, sendMessage, loadExistingPlan]);
 
+	// Auto-save session helper
+	const saveCurrentSession = useCallback(() => {
+		if (!autoSave) return;
+
+		// Only save if there are messages in the conversation
+		const history = agentRef.current.getHistory();
+		if (history.length === 0) return;
+
+		try {
+			const session = agentRef.current.exportSession();
+			saveSession(session);
+		} catch (error) {
+			// Silently fail - don't interrupt exit
+			console.error('Failed to save session:', error);
+		}
+	}, [autoSave]);
+
+	// Save session on unmount
+	useEffect(() => {
+		return () => {
+			saveCurrentSession();
+		};
+	}, [saveCurrentSession]);
+
 	// Handle keyboard shortcuts
 	useInput((input, key) => {
 		// Ctrl+C to cancel current operation or exit
@@ -154,6 +184,8 @@ export function AgentShell({
 			if (isLoading || isPlanProcessing) {
 				cancel();
 			} else {
+				// Save session before exiting
+				saveCurrentSession();
 				exit();
 			}
 			return;

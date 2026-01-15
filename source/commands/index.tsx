@@ -19,11 +19,15 @@ export default function Index() {
 				<Box marginLeft={2} flexDirection="column">
 					<Box>
 						<Text color="green">ask</Text>
-						<Text color="gray">     General assistant - chat without tools</Text>
+						<Text color="gray">      General assistant - chat with tools</Text>
+					</Box>
+					<Box>
+						<Text color="green">resume</Text>
+						<Text color="gray">   Resume a previous conversation</Text>
 					</Box>
 					<Box>
 						<Text color="green">help</Text>
-						<Text color="gray">    Show this help message</Text>
+						<Text color="gray">     Show this help message</Text>
 					</Box>
 				</Box>
 			</Box>
@@ -33,6 +37,8 @@ export default function Index() {
 				<Box marginLeft={2} flexDirection="column">
 					<Text color="gray">$ agentmaster ask</Text>
 					<Text color="gray">$ agentmaster ask --prompt "Explain TypeScript generics"</Text>
+					<Text color="gray">$ agentmaster resume</Text>
+					<Text color="gray">$ agentmaster resume --agent ask</Text>
 				</Box>
 			</Box>
 
