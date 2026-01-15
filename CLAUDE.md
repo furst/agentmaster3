@@ -765,9 +765,30 @@ Supported models with pricing:
 
 ## Session Management
 
-Sessions are **automatically saved** when you exit an agent (Ctrl+C). Use the `resume` command to continue previous conversations.
+Sessions are **automatically saved** when you exit an agent (Ctrl+C). Resume previous conversations using either:
 
-### Resume Command
+1. **`/resume` slash command** - Type `/resume` inside any agent to see previous sessions for that agent
+2. **`agentmaster resume`** - Standalone command to list all sessions across agents
+
+### /resume Slash Command (Inline)
+
+Type `/resume` while inside any agent to see and select previous sessions:
+
+```
+> /resume
+
+/resume - Select a previous session
+
+▸ 2 hours ago    4msg  How do I configure the vault...
+  yesterday      12msg What's the best approach for...
+  2 days ago     6msg  Can you help me with...
+
+↑↓ navigate | Enter: resume | d: delete | Esc: cancel
+```
+
+This shows only sessions for the current agent and lets you resume without exiting.
+
+### Resume Command (Standalone)
 
 ```bash
 # List all saved sessions

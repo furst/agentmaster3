@@ -6,7 +6,8 @@ import { TimelineView } from './TimelineView.js';
 import { InlineTimeline } from './Timeline.js';
 import { ErrorDisplay, ApiErrorDisplay } from './Error.js';
 import { ModelIndicator } from './ModelIndicator.js';
-import { type Agent } from '../core/agent.js';
+import { SessionSelector } from './SessionSelector.js';
+import { type Agent, type AgentSession } from '../core/agent.js';
 import { useAgentTimeline } from '../core/timeline.js';
 import { usePlanMode, isPlanningMessage } from '../core/plan-mode.js';
 import { saveSession } from '../core/session-manager.js';
@@ -111,6 +112,8 @@ export function AgentShell({
 	const [inputValue, setInputValue] = useState('');
 	// Attached images (extracted from dropped/pasted paths)
 	const [attachedImages, setAttachedImages] = useState<string[]>([]);
+	// Resume mode - show session selector
+	const [showResumeSelector, setShowResumeSelector] = useState(false);
 
 	// Plan mode state and handlers from custom hook
 	const {
@@ -222,6 +225,26 @@ export function AgentShell({
 		}
 	}, []);
 
+	// Handle session resume selection
+	const handleSessionSelect = useCallback((session: AgentSession) => {
+		// Save current session before switching (if there's content)
+		saveCurrentSession();
+
+		// Import the selected session
+		agentRef.current.importSession(session);
+
+		// Reset the timeline to reflect the imported session
+		reset();
+
+		// Close the selector
+		setShowResumeSelector(false);
+		setHasStarted(true);
+	}, [saveCurrentSession, reset]);
+
+	const handleResumeCancel = useCallback(() => {
+		setShowResumeSelector(false);
+	}, []);
+
 	// Handle input submission
 	const handleSubmit = useCallback(
 		(value: string) => {
@@ -231,6 +254,13 @@ export function AgentShell({
 
 			if (!textToSend && allImages.length === 0) return;
 			if (isLoading || isPlanProcessing) return;
+
+			// Handle /resume command
+			if (textToSend === '/resume') {
+				setShowResumeSelector(true);
+				setInputValue('');
+				return;
+			}
 
 			setHasStarted(true);
 
@@ -356,6 +386,16 @@ export function AgentShell({
 				</Box>
 			)}
 
+			{/* Session selector for /resume command */}
+			{showResumeSelector && (
+				<SessionSelector
+					agentName={agent.name}
+					onSelect={handleSessionSelect}
+					onCancel={handleResumeCancel}
+					color={color}
+				/>
+			)}
+
 			{/* Status bar */}
 			<Box marginTop={1} marginBottom={1}>
 				<InlineTimeline
@@ -386,7 +426,7 @@ export function AgentShell({
 			)}
 
 			{/* Input field */}
-			{!currentPlan && (
+			{!currentPlan && !showResumeSelector && (
 				<Box>
 					<Text color={planModeEnabled ? 'cyan' : color} bold>
 						{planModeEnabled ? '📋 ' : '> '}
