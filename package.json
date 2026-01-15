@@ -24,6 +24,7 @@
 		"dotenv": "^17.2.3",
 		"fuse.js": "^7.1.0",
 		"ink": "^5.0.0",
+		"ink-text-input": "^6.0.0",
 		"pastel": "^3.0.0",
 		"pdf-parse": "^2.4.5",
 		"react": "^18.2.0",

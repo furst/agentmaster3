@@ -1,5 +1,5 @@
-import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
-import { resolve, isAbsolute, join, extname } from 'node:path';
+import { readFile, writeFile, stat, mkdir } from 'node:fs/promises';
+import { resolve, isAbsolute, join, extname, dirname } from 'node:path';
 import { z } from 'zod';
 import { generateText } from 'ai';
 import { defineTool } from '../core/tools.js';
@@ -50,84 +50,49 @@ function getHoldingsFilePath(): string {
 }
 
 /**
- * List image files in holdings directory, sorted by modification time (newest first)
- */
-async function listHoldingsImages(): Promise<Array<{ name: string; path: string; modifiedAt: Date }>> {
-	const dir = getHoldingsDir();
-
-	try {
-		const files = await readdir(dir);
-		const imageFiles: Array<{ name: string; path: string; modifiedAt: Date }> = [];
-
-		for (const file of files) {
-			const ext = extname(file).toLowerCase();
-			if (IMAGE_EXTENSIONS.includes(ext)) {
-				const filePath = join(dir, file);
-				const stats = await stat(filePath);
-				imageFiles.push({
-					name: file,
-					path: filePath,
-					modifiedAt: stats.mtime,
-				});
-			}
-		}
-
-		// Sort by modification time, newest first
-		imageFiles.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
-		return imageFiles;
-	} catch (error) {
-		const err = error as NodeJS.ErrnoException;
-		if (err.code === 'ENOENT') {
-			return [];
-		}
-		throw error;
-	}
-}
-
-/**
  * Parse holdings image tool - uses vision model to extract holdings from screenshot
  */
 export const parseHoldingsImageTool = defineTool({
 	name: 'parse_holdings_image',
-	description: `Parse a screenshot of the user's holdings (from Avanza or similar) using AI vision. Extracts holdings data and saves to holdings.json. Call this when the user uploads a new holdings screenshot.`,
+	description: `Parse a screenshot of the user's holdings (from Avanza or similar) using AI vision. Extracts holdings data and saves to holdings.json. The user drops an image into the chat which provides the imagePath.`,
 	parameters: z.object({
-		imageName: z
+		imagePath: z
 			.string()
-			.optional()
-			.describe('Specific image filename to parse. If not provided, uses the most recent image.'),
+			.describe('Full path to the image file to parse. Extract this from the user message (e.g., "[Image #1: /path/to/image.png]").'),
 	}),
-	execute: async ({ imageName }) => {
+	execute: async ({ imagePath }) => {
 		try {
 			const config = getFinanceConfig();
-			const images = await listHoldingsImages();
 
-			if (images.length === 0) {
+			// Resolve the path
+			const resolvedPath = isAbsolute(imagePath) ? imagePath : resolve(process.cwd(), imagePath);
+
+			// Verify the file exists
+			try {
+				await stat(resolvedPath);
+			} catch {
 				return {
 					success: false,
-					error: `No images found in holdings directory. Add a screenshot to: ${getHoldingsDir()}`,
+					error: `Image file not found: ${resolvedPath}`,
 				};
 			}
 
-			// Find the image to parse
-			let targetImage: { name: string; path: string; modifiedAt: Date };
-			if (imageName) {
-				const found = images.find(img => img.name === imageName || img.name.includes(imageName));
-				if (!found) {
-					return {
-						success: false,
-						error: `Image "${imageName}" not found. Available: ${images.map(i => i.name).join(', ')}`,
-					};
-				}
-				targetImage = found;
-			} else {
-				// Default to most recent
-				targetImage = images[0]!;
+			// Verify it's a supported image format
+			const ext = extname(resolvedPath).toLowerCase();
+			if (!IMAGE_EXTENSIONS.includes(ext)) {
+				return {
+					success: false,
+					error: `Not a supported image format. Supported: ${IMAGE_EXTENSIONS.join(', ')}`,
+					providedPath: resolvedPath,
+				};
 			}
 
+			const imageName = resolvedPath.split('/').pop() || 'image';
+
 			// Read the image
-			const imageBuffer = await readFile(targetImage.path);
+			const imageBuffer = await readFile(resolvedPath);
 			const base64Image = imageBuffer.toString('base64');
-			const mimeType = targetImage.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+			const mimeType = imageName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 
 			// Use light model (Gemini Flash) for vision
 			const model = createMultiModel(config.lightModel);
@@ -212,18 +177,21 @@ Use null for missing fields. Include ALL visible holdings. MUST end with proper 
 			// Create the full holdings data structure
 			const fullData: HoldingsData = {
 				updatedAt: new Date().toISOString().split('T')[0] || new Date().toISOString(),
-				source: targetImage.name,
+				source: imageName,
 				totalValue: holdingsData.totalValue,
 				holdings: holdingsData.holdings,
 			};
 
-			// Save to JSON file
+			// Ensure directory exists
 			const outputPath = getHoldingsFilePath();
+			await mkdir(dirname(outputPath), { recursive: true });
+
+			// Save to JSON file
 			await writeFile(outputPath, JSON.stringify(fullData, null, 2), 'utf-8');
 
 			return {
 				success: true,
-				parsedFrom: targetImage.name,
+				parsedFrom: imageName,
 				savedTo: outputPath,
 				holdingsCount: fullData.holdings.length,
 				totalValue: fullData.totalValue,
@@ -301,46 +269,13 @@ export const readHoldingsTool = defineTool({
 			if (err.code === 'ENOENT') {
 				return {
 					success: false,
-					error: 'No holdings data found. Ask the user to upload a holdings screenshot and run parse_holdings_image.',
-					holdingsDirectory: getHoldingsDir(),
+					error: 'No holdings data found. Ask the user to drop a holdings screenshot into the chat.',
 				};
 			}
 
 			return {
 				success: false,
 				error: `Failed to read holdings: ${err.message}`,
-			};
-		}
-	},
-});
-
-/**
- * List holdings images tool - shows available screenshots
- */
-export const listHoldingsImagesTool = defineTool({
-	name: 'list_holdings_images',
-	description: 'List available holdings screenshots in the holdings directory. Useful to see what images are available before parsing.',
-	parameters: z.object({}),
-	execute: async () => {
-		try {
-			const images = await listHoldingsImages();
-			const dir = getHoldingsDir();
-
-			return {
-				success: true,
-				directory: dir,
-				imageCount: images.length,
-				images: images.map(img => ({
-					name: img.name,
-					modifiedAt: img.modifiedAt.toISOString(),
-				})),
-			};
-		} catch (error) {
-			const err = error as Error;
-			return {
-				success: false,
-				error: `Failed to list images: ${err.message}`,
-				directory: getHoldingsDir(),
 			};
 		}
 	},

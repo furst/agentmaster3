@@ -10,7 +10,7 @@ export { listPdfsTool } from './list-pdfs.js';
 export { readPdfTool } from './read-pdf.js';
 export { readMindsetTool, saveMindsetTool } from './mindset.js';
 export { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
-export { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
+export { parseHoldingsImageTool, readHoldingsTool } from './holdings.js';
 export { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
 export { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
 export { saveMemoryTool } from './memory.js';
@@ -23,7 +23,7 @@ import { listPdfsTool } from './list-pdfs.js';
 import { readPdfTool } from './read-pdf.js';
 import { readMindsetTool, saveMindsetTool } from './mindset.js';
 import { listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool } from './obsidian-vault.js';
-import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from './holdings.js';
+import { parseHoldingsImageTool, readHoldingsTool } from './holdings.js';
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from './research-notes.js';
 import { createTodosTool, updateTodoTool, getTodosTool, clearTodosTool } from './session-todo.js';
 import { saveMemoryTool } from './memory.js';
@@ -48,7 +48,6 @@ export const allTools = [
 	searchVaultTool,
 	parseHoldingsImageTool,
 	readHoldingsTool,
-	listHoldingsImagesTool,
 	saveResearchNoteTool,
 	readResearchNotesTool,
 	listResearchNotesTool,
@@ -70,7 +69,7 @@ export const allToolsRecord = createToolsRecord(allTools);
 export const toolCategories = {
 	filesystem: [readFileTool, listPdfsTool, readPdfTool],
 	web: [webSearchTool, exaSearchTool, exaGetContentsTool, jinaReaderTool],
-	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool, parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool],
+	finance: [listPdfsTool, readPdfTool, readMindsetTool, saveMindsetTool, parseHoldingsImageTool, readHoldingsTool],
 	obsidian: [listVaultNotesTool, readVaultNoteTool, writeVaultNoteTool, searchVaultTool],
 	research: [saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool],
 	productivity: [createTodosTool, updateTodoTool, getTodosTool, clearTodosTool],

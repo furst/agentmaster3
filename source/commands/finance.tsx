@@ -13,7 +13,7 @@ import { createWebResearchAgent } from "../agents/web-research-agent.js";
 
 // Direct tools (finance-specific)
 import { readMindsetTool, saveMindsetTool } from "../tools/mindset.js";
-import { parseHoldingsImageTool, readHoldingsTool, listHoldingsImagesTool } from "../tools/holdings.js";
+import { parseHoldingsImageTool, readHoldingsTool } from "../tools/holdings.js";
 import { saveResearchNoteTool, readResearchNotesTool, listResearchNotesTool } from "../tools/research-notes.js";
 import { saveMemoryTool } from "../tools/memory.js";
 
@@ -131,7 +131,6 @@ export default function Finance({ options }: Props) {
           saveMindsetTool,
           parseHoldingsImageTool,
           readHoldingsTool,
-          listHoldingsImagesTool,
           saveResearchNoteTool,
           readResearchNotesTool,
           listResearchNotesTool,

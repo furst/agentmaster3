@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { TextInput } from '@inkjs/ui';
+import TextInput from 'ink-text-input';
 import { PlanReview, PlanModeIndicator } from './PlanReview.js';
 import { TimelineView } from './TimelineView.js';
 import { InlineTimeline } from './Timeline.js';
@@ -9,6 +9,51 @@ import { ModelIndicator } from './ModelIndicator.js';
 import { type Agent } from '../core/agent.js';
 import { useAgentTimeline } from '../core/timeline.js';
 import { usePlanMode, isPlanningMessage } from '../core/plan-mode.js';
+
+// Image file extensions we detect
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+
+/**
+ * Detect if a string looks like an image file path
+ */
+function isImagePath(str: string): boolean {
+	const trimmed = str.trim();
+	const lower = trimmed.toLowerCase();
+	return IMAGE_EXTENSIONS.some(ext => lower.endsWith(ext)) &&
+		(trimmed.startsWith('/') || trimmed.startsWith('~') || trimmed.includes('/'));
+}
+
+/**
+ * Extract image paths from input text
+ * Returns [remainingText, extractedPaths]
+ */
+function extractImagePaths(text: string): [string, string[]] {
+	const paths: string[] = [];
+	let remaining = text;
+
+	// Match file paths (starting with / or ~ or containing /)
+	// Common patterns when dropping files into terminal
+	const pathPattern = /(?:^|\s)((?:\/|~)[^\s]+\.(?:png|jpg|jpeg|webp|gif))(?:\s|$)/gi;
+
+	let match;
+	while ((match = pathPattern.exec(text)) !== null) {
+		const path = match[1]!.trim();
+		if (isImagePath(path)) {
+			paths.push(path);
+			remaining = remaining.replace(path, '').trim();
+		}
+	}
+
+	// Also check if the entire input is just a path
+	if (paths.length === 0 && isImagePath(text.trim())) {
+		return ['', [text.trim()]];
+	}
+
+	// Clean up extra spaces
+	remaining = remaining.replace(/\s+/g, ' ').trim();
+
+	return [remaining, paths];
+}
 
 export interface AgentShellProps {
 	/** The agent instance to use */
@@ -56,8 +101,10 @@ export function AgentShell({
 	} = useAgentTimeline(agent);
 
 	const [hasStarted, setHasStarted] = useState(false);
-	// Key to force re-mount TextInput after submission (clears the input)
-	const [inputKey, setInputKey] = useState(0);
+	// Controlled input value
+	const [inputValue, setInputValue] = useState('');
+	// Attached images (extracted from dropped/pasted paths)
+	const [attachedImages, setAttachedImages] = useState<string[]>([]);
 
 	// Plan mode state and handlers from custom hook
 	const {
@@ -116,7 +163,8 @@ export function AgentShell({
 		if (key.ctrl && input === 'r') {
 			reset();
 			resetPlanState();
-			setInputKey((k) => k + 1);
+			setInputValue('');
+			setAttachedImages([]);
 			return;
 		}
 
@@ -129,23 +177,57 @@ export function AgentShell({
 		}
 	});
 
+	// Handle input change - detect and extract image paths in real-time
+	const handleInputChange = useCallback((value: string) => {
+		const [remaining, newPaths] = extractImagePaths(value);
+
+		if (newPaths.length > 0) {
+			// Found image paths - add to attachments and keep remaining text
+			setAttachedImages(prev => [...prev, ...newPaths]);
+			setInputValue(remaining);
+		} else {
+			setInputValue(value);
+		}
+	}, []);
+
 	// Handle input submission
 	const handleSubmit = useCallback(
 		(value: string) => {
-			if (!value.trim() || isLoading || isPlanProcessing) return;
+			// Use current input value and attached images
+			const textToSend = value.trim();
+			const allImages = attachedImages;
+
+			if (!textToSend && allImages.length === 0) return;
+			if (isLoading || isPlanProcessing) return;
+
 			setHasStarted(true);
+
+			// Format message with image attachments if any
+			let finalMessage: string;
+			if (allImages.length > 0) {
+				const imageRefs = allImages.map((path, i) => `[Image #${i + 1}: ${path}]`).join('\n');
+				if (textToSend) {
+					finalMessage = `${textToSend}\n\n${imageRefs}`;
+				} else {
+					// Just images, no text - add default action
+					finalMessage = `Parse my portfolio from the attached image.\n\n${imageRefs}`;
+				}
+			} else {
+				finalMessage = textToSend;
+			}
 
 			// If plan mode is enabled and no current plan, create one first
 			if (planModeEnabled && !currentPlan) {
-				createPlanFromPrompt(value.trim());
+				createPlanFromPrompt(finalMessage);
 			} else {
-				sendMessage(value.trim());
+				sendMessage(finalMessage);
 			}
 
-			// Force re-mount to clear input
-			setInputKey((k) => k + 1);
+			// Clear input state
+			setInputValue('');
+			setAttachedImages([]);
 		},
-		[isLoading, isPlanProcessing, planModeEnabled, currentPlan, sendMessage, createPlanFromPrompt]
+		[isLoading, isPlanProcessing, planModeEnabled, currentPlan, sendMessage, createPlanFromPrompt, attachedImages]
 	);
 
 	// Determine current status for inline status bar
@@ -259,6 +341,18 @@ export function AgentShell({
 				)}
 			</Box>
 
+			{/* Attached images indicator */}
+			{attachedImages.length > 0 && (
+				<Box flexDirection="column" marginBottom={1}>
+					{attachedImages.map((imgPath, index) => (
+						<Box key={imgPath}>
+							<Text color="magenta">[Image #{index + 1}]</Text>
+							<Text color="gray" dimColor> {imgPath.split('/').pop()}</Text>
+						</Box>
+					))}
+				</Box>
+			)}
+
 			{/* Input field */}
 			{!currentPlan && (
 				<Box>
@@ -266,16 +360,19 @@ export function AgentShell({
 						{planModeEnabled ? '📋 ' : '> '}
 					</Text>
 					<TextInput
-						key={inputKey}
+						value={inputValue}
+						onChange={handleInputChange}
+						onSubmit={handleSubmit}
 						placeholder={
 							isLoading || isPlanProcessing
 								? 'Processing...'
-								: planModeEnabled
-									? 'Describe your task (will research, then plan)...'
-									: placeholder
+								: attachedImages.length > 0
+									? 'Add a message or press Enter to parse...'
+									: planModeEnabled
+										? 'Describe your task (will research, then plan)...'
+										: placeholder
 						}
-						onSubmit={handleSubmit}
-						isDisabled={isLoading || isPlanProcessing}
+						focus={!isLoading && !isPlanProcessing}
 					/>
 				</Box>
 			)}
