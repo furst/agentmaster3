@@ -1,0 +1,20 @@
+{
+  "models": {
+    "light": "google:gemini-3-flash-preview",
+    "strong": "google:gemini-3-pro-preview",
+    "reasoning": {
+      "enabled": false,
+      "budgetTokens": 10000
+    }
+  },
+  "memory": {
+    "directory": "./data/memory"
+  },
+  "obsidian": {
+    "vaultPath": "/path/to/your/obsidian/vault",
+    "maxFileSizeBytes": 102400,
+    "maxWriteSizeBytes": 51200,
+    "backupOnWrite": true,
+    "allowedSubfolders": ["Notes", "Projects"]
+  }
+}

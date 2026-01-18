@@ -1,0 +1,18 @@
+{
+	"extends": "@sindresorhus/tsconfig",
+	"compilerOptions": {
+		"moduleResolution": "node16",
+		"module": "Node16",
+		"outDir": "dist",
+		"rootDir": "src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"declaration": true,
+		"declarationMap": true,
+		"composite": true
+	},
+	"include": ["src"]
+}

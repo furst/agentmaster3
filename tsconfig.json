@@ -1,0 +1,13 @@
+{
+	"extends": "@sindresorhus/tsconfig",
+	"compilerOptions": {
+		"moduleResolution": "node16",
+		"module": "Node16",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true
+	},
+	"files": []
+}

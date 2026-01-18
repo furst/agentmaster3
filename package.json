@@ -1,0 +1,23 @@
+{
+	"name": "conductor",
+	"version": "0.0.1",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"packages/*",
+		"apps/*"
+	],
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "npm run build --workspaces",
+		"dev": "npm run dev --workspaces --if-present",
+		"start": "node apps/agents/dist/cli.js"
+	},
+	"devDependencies": {
+		"@sindresorhus/tsconfig": "^3.0.1",
+		"typescript": "^5.0.3"
+	}
+}

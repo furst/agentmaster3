@@ -1,0 +1,17 @@
+{
+  "news": {
+    "sites": ["news.ycombinator.com", "techcrunch.com", "theverge.com"],
+    "interests": ["technology", "artificial intelligence"],
+    "defaultCount": 5
+  },
+  "finance": {
+    "newsletterDirectory": "./newsletters",
+    "mindsetPath": "./investment-mindset.md",
+    "holdingsDirectory": "./data/holdings",
+    "researchSources": {
+      "social": ["reddit.com", "twitter.com", "x.com", "news.ycombinator.com"],
+      "news": ["seekingalpha.com", "finance.yahoo.com", "marketwatch.com", "bloomberg.com"],
+      "redditSubs": ["investing", "stocks", "wallstreetbets", "options"]
+    }
+  }
+}
